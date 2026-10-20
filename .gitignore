@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+venv/
+myenv/
+.venv/
+*.egg-info/
+
+# Datos de prueba generados
+data/
+*.log
+!doc/*.log
+
+# Base de datos local
+*.sqlite
+*.sqlite3
+*.db
+
+# Entorno y SO
+.env
+.DS_Store
