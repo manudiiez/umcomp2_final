@@ -1,0 +1,56 @@
+name: Bug
+description: Algo no funciona como debería
+labels: ["bug"]
+body:
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: Qué pasa
+      description: Comportamiento actual, con el mensaje de error si hay.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué debería pasar
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+      placeholder: |
+        1. Ir a …
+        2. Hacer …
+        3. Ver error
+    validations:
+      required: true
+  - type: dropdown
+    id: entorno
+    attributes:
+      label: Entorno
+      options:
+        - Producción
+        - Testing (staging)
+        - Local
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión / imagen
+      placeholder: v1.3.0 o sha-abc1234
+  - type: dropdown
+    id: prioridad
+    attributes:
+      label: Prioridad
+      options:
+        - "crítica: producción caída o datos en riesgo"
+        - "alta: funcionalidad clave rota, sin alternativa"
+        - "media: hay alternativa"
+        - "baja: molesto pero menor"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / capturas
+      render: shell

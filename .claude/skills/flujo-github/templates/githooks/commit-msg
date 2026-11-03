@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# flujo-github: valida Conventional Commits en cada commit.
+# Activar en cada clon: git config core.hooksPath .githooks
+set -euo pipefail
+
+msg_file="$1"
+# Primera línea que no sea comentario de git
+header="$(grep -v '^#' "$msg_file" | head -n1 || true)"
+
+# Commits generados por git o por el flujo de rebase: se aceptan tal cual
+if [[ "$header" =~ ^(Merge\ |Revert\ \"|fixup!\ |squash!\ |amend!\ ) ]]; then
+  exit 0
+fi
+
+re='^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: [^[:space:]].*$'
+
+if [[ ! "$header" =~ $re ]]; then
+  cat >&2 <<EOF
+✖ Mensaje de commit inválido (Conventional Commits):
+    "$header"
+
+  Formato:  tipo(scope opcional)!: descripción en imperativo
+  Tipos:    feat fix perf refactor docs test build ci chore style revert
+  Ejemplos: feat(listings): agregar filtro por rango de precio
+            fix(mercadolibre): reintentar publicación ante 429
+            chore: actualizar dependencias
+EOF
+  exit 1
+fi
+
+if (( ${#header} > 100 )); then
+  echo "✖ La primera línea del commit supera 100 caracteres (${#header})." >&2
+  exit 1
+fi
+
+exit 0

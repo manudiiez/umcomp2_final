@@ -1,0 +1,60 @@
+# Checks requeridos por los rulesets (flujo-github). No cambiar los `name:` de los jobs
+# sin actualizar scripts/apply-rulesets.sh.
+name: pr-checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [develop, testing, main]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    name: pr-title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar título (Conventional Commits)
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          re='^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: [^[:space:]].*$'
+          if [[ ! "$TITLE" =~ $re ]]; then
+            echo "::error::El título del PR no cumple Conventional Commits: \"$TITLE\""
+            echo "Formato: tipo(scope opcional)!: descripción  — ej.: fix(listings): evitar precio null"
+            exit 1
+          fi
+          if (( ${#TITLE} > 100 )); then
+            echo "::error::El título supera 100 caracteres (${#TITLE})."
+            exit 1
+          fi
+          echo "OK: $TITLE"
+
+  branch-policy:
+    name: branch-policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar rama de origen y destino
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          case "$BASE" in
+            develop)
+              [[ "$HEAD" =~ ^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert|dependabot)/.+ || "$HEAD" == "main" ]] \
+                || fail "A develop solo entran ramas de trabajo (feat/, fix/, chore/…) o el back-merge desde main. Recibido: $HEAD"
+              ;;
+            testing)
+              [[ "$HEAD_REPO" == "$REPO" ]] || fail "No se aceptan PRs desde forks hacia testing."
+              [[ "$HEAD" == "develop" ]] || fail "A testing solo se promueve desde develop. Recibido: $HEAD"
+              ;;
+            main)
+              [[ "$HEAD_REPO" == "$REPO" ]] || fail "No se aceptan PRs desde forks hacia main."
+              [[ "$HEAD" == "testing" || "$HEAD" =~ ^hotfix/.+ ]] || fail "A main solo se promueve desde testing o hotfix/*. Recibido: $HEAD"
+              ;;
+          esac
+          echo "OK: $HEAD -> $BASE"

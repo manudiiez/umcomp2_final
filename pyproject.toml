@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loghunter"
+version = "0.1.0"
+description = "Analizador distribuido de logs para Computación II"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/manudiiez/umcomp2_final"
+Issues = "https://github.com/manudiiez/umcomp2_final/issues"
+
+[dependency-groups]
+dev = ["pytest>=8.4,<10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --import-mode=importlib"
+
+[tool.uv]
+required-version = ">=0.8.0"
