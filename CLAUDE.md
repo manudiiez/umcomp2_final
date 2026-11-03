@@ -10,9 +10,11 @@ de sockets concurrentes, IPC, asincronismo de I/O y colas de tareas distribuidas
 por lo que **los mecanismos elegidos son el objeto de la evaluación**, no solo el
 resultado funcional.
 
-**Estado actual: no hay código.** La arquitectura figura como aprobada en principio
-con los ajustes documentados. El repositorio contiene la especificación consolidada,
-casos de uso y ADR en `doc/`.
+**Estado actual: base Python iniciada.** El paquete está en `src/loghunter`, con
+módulos reservados e importación sin servicios. El entorno se prepara con
+`uv sync --locked --python 3.12` y las pruebas con `uv run --locked python -m pytest`.
+Consultar `INSTALL.md`; las funcionalidades de análisis todavía están pendientes.
+La especificación, los casos de uso y los ADR están en `doc/`.
 
 La documentación y los mensajes de commit están en **castellano**.
 
@@ -162,10 +164,9 @@ Consultas soportadas: `top-ips`, `status`, `urls`, `traffic`.
 
 ## Pendientes del repositorio
 
-`FINAL.md` exige estos archivos para la presentación final; se escriben cuando haya
-código:
+`FINAL.md` exige estos archivos para la presentación final:
 
-- `INSTALL.md` — clonado, instalación y despliegue.
+- `INSTALL.md` — existe para la base Python; ampliar con servicios y despliegue.
 - `INFO.md` — decisiones de diseño y su justificación.
 - `TODO.md` — mejoras y features futuras. Arrancar desde las exclusiones de
   `doc/PROJECT_STATEMENT.md` §3.2.

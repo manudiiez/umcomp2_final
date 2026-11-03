@@ -1,6 +1,6 @@
 # LogHunter — especificación del proyecto
 
-Fecha: 2026-11-02. Estado: especificación para desarrollo; aplicación todavía sin implementar.
+Fecha: 2026-11-02. Estado: desarrollo iniciado con la base Python; funcionalidades pendientes.
 
 ## 1. Propósito y autoridad del documento
 
@@ -79,6 +79,7 @@ En la demo, `generar.py` puede crearlos directamente en el destino elegido.
 | Tecnología | Uso |
 |---|---|
 | CPython 3.12 | Base de ejecución elegida para el desarrollo, con GIL convencional |
+| uv, `pyproject.toml` y `uv.lock` | Entorno `.venv`, instalación del paquete y versiones reproducibles de desarrollo |
 | `asyncio` | Servidor TCP, corrutinas, semáforo, tareas de supervisión y señales |
 | `json`, UTF-8 | Serialización de mensajes de red y de tareas/resultados |
 | Celery con soporte Redis (`celery[redis]`) | Despacho y ejecución distribuida con pool de procesos `prefork` |
@@ -720,7 +721,7 @@ antes de la mesa, y poder explicar tecnologías, decisiones y pequeñas correcci
 
 | Tema | Regla |
 |---|---|
-| Estado del proyecto | Especificación para desarrollo; aplicación todavía sin implementar. |
+| Estado del proyecto | Base Python instalable iniciada; funcionalidades de análisis pendientes. |
 | Cortes | Fin exclusivo y propiedad por inicio de línea; consultar byte anterior evita descartar una línea completa en un corte exacto. |
 | Tamaños | Flags `--chunk-mb` y `--size-mb` en MiB; 2 GiB / 32 MiB = 64 tareas. |
 | Extensión de línea | 64 KiB por bloque, repetible; ninguna longitud máxima se deduce de ese número. |
