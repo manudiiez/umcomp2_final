@@ -5,7 +5,8 @@ alternativas y consecuencias. Estos documentos acompañan la especificación de
 [LogHunter](../PROJECT_STATEMENT.md) y sus [casos de uso](../USE_CASES.md).
 
 Fecha de consolidación: 2026-11-02. Estado de los ADR siguientes: **adoptado para
-la implementación**; todavía no existe código que materialice las decisiones.
+la implementación**. El estado de desarrollo se indica en el README y en el plan;
+la adopción de una decisión no implica que toda su funcionalidad esté terminada.
 Cada decisión contiene su contexto y justificación técnica, y se relaciona con
 la especificación y los casos de uso vigentes.
 
@@ -27,6 +28,7 @@ la especificación y los casos de uso vigentes.
 | [0012](0012-despliegue-y-entorno.md) | Desplegar con Docker Compose y permitir workers remotos |
 | [0013](0013-desarrollo-y-verificacion.md) | Desarrollar incrementalmente y verificar con datos reproducibles |
 | [0014](0014-flujo-github-por-milestones.md) | Asociar issues a milestones e integrar solo mediante PRs |
+| [0015](0015-paquete-python-y-entorno.md) | Empaquetar en src y reproducir el entorno virtual con uv y lockfile |
 
 ## Mantenimiento
 
