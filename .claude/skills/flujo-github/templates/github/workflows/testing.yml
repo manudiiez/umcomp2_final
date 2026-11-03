@@ -1,0 +1,79 @@
+# Staging (flujo-github): cada merge a `testing` corre los tests y, si pasan,
+# publica la imagen :testing (+ :sha-<commit>). Adaptar según references/ci.md.
+name: testing
+
+on:
+  push:
+    branches: [testing]
+  workflow_dispatch:
+
+concurrency:
+  group: testing
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  STAGING_TAG: testing
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # >>> ADAPTAR: reemplazar este paso por los tests reales del repo.
+      # Python/FastAPI:
+      #   - uses: actions/setup-python@v5
+      #     with: { python-version: "3.12", cache: pip }
+      #   - run: pip install -r requirements.txt -r requirements-dev.txt
+      #   - run: pytest -q
+      # Next.js:
+      #   - uses: actions/setup-node@v4
+      #     with: { node-version: 20, cache: npm }
+      #   - run: npm ci
+      #   - run: npm run lint
+      #   - run: npm test --if-present
+      #   - run: npm run build
+      - name: Tests (pendiente de configurar)
+        run: echo "::warning::Todavía no hay tests configurados en .github/workflows/testing.yml"
+
+  image:
+    name: image
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.STAGING_TAG }}
+            type=sha,prefix=sha-,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # file: ./Dockerfile
+          # build-args: |
+          #   NEXT_PUBLIC_API_URL=${{ vars.API_URL_TESTING }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

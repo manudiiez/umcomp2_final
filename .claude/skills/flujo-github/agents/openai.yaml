@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flujo GitHub de LogHunter"
+  short_description: "Issues, milestones, PRs y commits de LogHunter"
+  default_prompt: "Usá $flujo-github para gestionar esta tarea de LogHunter con su issue, milestone y ruta correcta de pull requests."

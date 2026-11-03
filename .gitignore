@@ -20,3 +20,6 @@ data/
 # Entorno y SO
 .env
 .DS_Store
+
+# Claude Code (configuración personal)
+.claude/settings.local.json
