@@ -2,10 +2,14 @@
 
 ## Estado actual
 
-El issue #2 prepara el paquete instalable y las pruebas iniciales. Los módulos
-de cliente, coordinador, workers, lector, indexador y generador tienen su ubicación
-reservada. Su ejecución informa que todavía no están implementados y termina
-con error; no inicia servicios ni simula un análisis exitoso.
+El milestone 2 implementó el núcleo de análisis local: `loghunter.parser`,
+`loghunter.consultas`, `loghunter.generar`, `loghunter.lector` (backend
+`local://`) y `loghunter.workers` (map-reduce por tramos en memoria), con
+pruebas que comparan el resultado por tramos contra una referencia
+secuencial (ver [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md)).
+`cliente.py`, `coordinador.py`, `tasks.py` e `indexador.py` siguen con su
+ubicación reservada: su ejecución informa que todavía no están implementados
+y termina con error; no inician servicios ni simulan un análisis exitoso.
 
 Los requisitos y futuras funcionalidades están en
 [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), y el orden de implementación en

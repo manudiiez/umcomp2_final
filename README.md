@@ -7,8 +7,12 @@ Facultad de Ingeniería, Ingeniería en Informática.
 
 ## Estado
 
-El desarrollo comenzó con el paquete instalable, el entorno virtual y las pruebas
-de importación. Las funcionalidades de análisis todavía están en desarrollo.
+El núcleo de análisis local está implementado y verificado: parser del
+formato combined, agregadores de las cuatro consultas, generador de logs
+reproducibles, lector de rangos por `mmap` y el map-reduce por tramos
+(`loghunter.workers`), todo sin Redis, MinIO ni sockets. La distribución con
+Celery, la capa cliente-servidor y la persistencia todavía están pendientes;
+ver el detalle en [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md).
 La especificación se encuentra
 en [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), acompañada por los casos de uso y ADR.
 
@@ -20,6 +24,7 @@ en [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), acompañada por los casos d
 | [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md) | Objetivo, alcance, tecnologías, arquitectura, contratos, ejemplos y aceptación |
 | [USE_CASES.md](doc/USE_CASES.md) | Casos de uso con flujos, alternativas y resultados esperados |
 | [Plan de desarrollo](doc/DEVELOPMENT_PLAN.md) | Etapas técnicas, issues de GitHub y dependencias para avanzar paso a paso |
+| [Verificación del núcleo](doc/VERIFICACION_NUCLEO.md) | Comandos y resultados reales de la verificación local (milestone 2) |
 | [Índice de ADR](doc/adr/INDEX.md) | Decisiones de arquitectura y desarrollo, alternativas y consecuencias |
 | [Skill de GitHub](.claude/skills/flujo-github/SKILL.md) | Conventional Commits y PRs de issue a milestone, develop y main |
 
