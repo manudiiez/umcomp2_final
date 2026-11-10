@@ -82,12 +82,14 @@ de desarrollo `pytest`. `uv.lock` registra las versiones resueltas y hashes; amb
 archivos se versionan juntos. No editar el lockfile a mano.
 
 A partir del issue #9, `pyproject.toml` agrega `celery[redis]` y `boto3` como
-dependencias de ejecución, y `moto[s3]` como dependencia de desarrollo: permite
-probar el backend S3 (`lector.py`, `generar.py`) con un MinIO simulado en
-memoria, sin levantar contenedores, en el mismo `uv run --locked python -m
-pytest` de siempre. La verificación real contra Redis y MinIO en Docker
-(issues #10-#14) se documenta por separado y no es parte de la suite
-automática de esta instalación.
+dependencias de ejecución. Las pruebas del backend S3 (issue #11) no
+dependen de Docker ni de un MinIO real: inyectan un cliente `boto3` doble
+propio (`tests/test_lector_s3.py`), porque `moto` —la alternativa obvia para
+simular S3 en memoria— no intercepta correctamente las llamadas con la
+versión de `botocore` instalada en este entorno; se evaluó y se descartó
+por eso, no por preferencia de estilo. La verificación real contra Redis y
+MinIO en Docker (issues #10, #13 y #14) se documenta por separado y no es
+parte de la suite automática de esta instalación.
 
 Para construir la distribución local, sin publicarla en PyPI:
 

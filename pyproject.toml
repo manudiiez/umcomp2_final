@@ -19,7 +19,6 @@ Issues = "https://github.com/manudiiez/umcomp2_final/issues"
 
 [dependency-groups]
 dev = [
-    "moto[s3]>=5.0,<6",
     "pytest>=8.4,<10",
 ]
 
