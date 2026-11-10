@@ -2,27 +2,27 @@
 
 ## Estado actual
 
-El milestone 2 implementó el núcleo de análisis local: `loghunter.parser`,
-`loghunter.consultas`, `loghunter.generar`, `loghunter.lector` (backend
-`local://`) y `loghunter.workers` (map-reduce por tramos en memoria), con
-pruebas que comparan el resultado por tramos contra una referencia
-secuencial (ver [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md)).
+Los seis milestones de `doc/DEVELOPMENT_PLAN.md` están implementados y
+verificados con infraestructura real:
 
-El milestone 3 agregó la distribución remota: `loghunter.tasks` (tarea
-Celery `map_chunk` sobre Redis), el backend `s3://` de `loghunter.lector` y
-la subida de logs a MinIO en `loghunter.generar`, y `loghunter.analisis`
-(correlación de grupos de tareas y reduce de parciales). Verificado con
-Redis, MinIO y workers Celery reales, incluyendo un worker sin acceso al
-filesystem del log y la recuperación tras perder un worker (ver
-[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md)).
+| Milestone | Qué agrega | Evidencia |
+|---|---|---|
+| 2 — núcleo local | `parser`, `consultas`, `generar`, `lector` (`local://`), `workers` (map-reduce en memoria) | [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md) |
+| 3 — distribución remota | `tasks` (Celery/Redis), backend `s3://`, subida a MinIO, `analisis` (correlación y reduce) | [VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md) |
+| 4 — cliente-servidor | `protocolo` (TCP/JSON por LF), `coordinador` (`asyncio`), `cliente` (CLI) | `tests/test_protocolo.py`, `tests/test_coordinador.py`, `tests/test_cliente.py` |
+| 5 — persistencia e IPC | `indexador` (proceso hijo, SQLite), `ipc.Metricas`, señales y apagado ordenado | `tests/test_indexador.py`, `tests/test_ipc.py`, `tests/test_operacion.py` |
+| 6 — integración y entrega | Fallos reales, Docker Compose, benchmark, documentación final | [VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md), [VERIFICACION_INTEGRACION.md](doc/VERIFICACION_INTEGRACION.md), [VERIFICACION_BENCHMARK.md](doc/VERIFICACION_BENCHMARK.md) |
 
-`cliente.py`, `coordinador.py` e `indexador.py` siguen con su ubicación
-reservada: su ejecución informa que todavía no están implementados y
-termina con error; no inician servicios ni simulan un análisis exitoso.
+`cliente.py`, `coordinador.py` e `indexador.py` ya no son solo ubicación
+reservada: forman la aplicación cliente-servidor real (ver
+[GUIA_DEMO.md](doc/GUIA_DEMO.md) para un recorrido ejecutable de punta a
+punta).
 
-Los requisitos y futuras funcionalidades están en
-[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), y el orden de implementación en
-[DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md).
+El contrato de implementación está en
+[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md); el orden en que se construyó,
+en [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md); las decisiones y su
+justificación, en [INFO.md](INFO.md); lo explícitamente fuera de alcance, en
+[TODO.md](TODO.md).
 
 ## Requisitos
 
@@ -40,13 +40,13 @@ Utilizar una versión de mantenimiento actualizada de CPython 3.12.
 ```bash
 git clone https://github.com/manudiiez/umcomp2_final.git
 cd umcomp2_final
-# Hasta integrar esta etapa en main, seleccionar la rama que contiene este issue.
-git switch build/2-estructura-proyecto
+# Mientras la entrega no esté promovida a main (ver doc/DEVELOPMENT_PLAN.md),
+# develop tiene la implementación completa de los seis milestones.
+git switch develop
 uv sync --locked --python 3.12
 ```
 
-Al estar el cambio integrado en otra rama, seleccionar esa rama en lugar de la
-del ejemplo. El comando instala el proyecto en modo editable y las herramientas
+El comando instala el proyecto en modo editable y las herramientas
 del grupo `dev`, con las versiones exactas de `uv.lock`. El entorno `.venv/` es
 local y no se versiona. Para usar un intérprete concreto:
 
@@ -116,9 +116,10 @@ La instalación y la mayoría de las pruebas (incluidas las del backend S3, que
 usan `moto` para simular MinIO en memoria) no necesitan Redis, MinIO ni Docker.
 Son necesarios solo para la ejecución real de tareas distribuidas (issues
 #10, #13 y #14) y para `python -m loghunter.generar -o s3://...` contra un
-MinIO real. Este milestone **no** instala Docker Compose todavía (eso es el
-issue #24): los siguientes comandos arrancan cada servicio por separado, para
-desarrollo en un solo host.
+MinIO real. Los siguientes comandos arrancan cada servicio por separado, útil
+para desarrollo iterativo en un solo host; para un despliegue completo con
+`docker-compose.yml` (coordinador y worker incluidos), ver "Despliegue con
+Docker Compose" más abajo.
 
 ### Redis (broker y backend de resultados)
 
