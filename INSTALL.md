@@ -81,9 +81,13 @@ mantiene su propia `.venv`.
 de desarrollo `pytest`. `uv.lock` registra las versiones resueltas y hashes; ambos
 archivos se versionan juntos. No editar el lockfile a mano.
 
-En esta etapa LogHunter usa solo la biblioteca estándar. Celery, Redis y boto3
-se incorporarán al implementar sus módulos, agregando la dependencia a
-`pyproject.toml` y actualizando el lockfile en la rama de su issue.
+A partir del issue #9, `pyproject.toml` agrega `celery[redis]` y `boto3` como
+dependencias de ejecución, y `moto[s3]` como dependencia de desarrollo: permite
+probar el backend S3 (`lector.py`, `generar.py`) con un MinIO simulado en
+memoria, sin levantar contenedores, en el mismo `uv run --locked python -m
+pytest` de siempre. La verificación real contra Redis y MinIO en Docker
+(issues #10-#14) se documenta por separado y no es parte de la suite
+automática de esta instalación.
 
 Para construir la distribución local, sin publicarla en PyPI:
 
@@ -97,6 +101,91 @@ construcción se resuelven en un entorno aislado.
 
 ## Servicios externos
 
-La instalación y las pruebas iniciales no necesitan Redis, MinIO ni Docker.
-Su arranque, configuración y pruebas se documentarán al implementar los issues
-de infraestructura y despliegue.
+La instalación y la mayoría de las pruebas (incluidas las del backend S3, que
+usan `moto` para simular MinIO en memoria) no necesitan Redis, MinIO ni Docker.
+Son necesarios solo para la ejecución real de tareas distribuidas (issues
+#10, #13 y #14) y para `python -m loghunter.generar -o s3://...` contra un
+MinIO real. Este milestone **no** instala Docker Compose todavía (eso es el
+issue #24): los siguientes comandos arrancan cada servicio por separado, para
+desarrollo en un solo host.
+
+### Redis (broker y backend de resultados)
+
+```bash
+docker run -d --name loghunter-redis -p 6379:6379 redis:7-alpine
+```
+
+Verificación:
+
+```bash
+docker exec loghunter-redis redis-cli ping   # PONG
+```
+
+### MinIO (almacenamiento compatible con S3)
+
+Las imágenes `minio/minio` dejaron de estar disponibles sin autenticación en
+Docker Hub y `quay.io/minio/minio` exige login desde la migración de MinIO a
+una licencia más restrictiva (2024-2025); no es un cambio de arquitectura
+(ADR-0004 sigue vigente: sigue siendo la API S3 de MinIO), solo de origen de
+la imagen. Se usa el espejo `bitnamilegacy/minio`, con tag fijo, verificado al
+implementar este issue:
+
+```bash
+docker run -d --name loghunter-minio -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+  bitnamilegacy/minio:2025.7.23-debian-12-r5
+```
+
+Verificación:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:9000/minio/health/live   # 200
+```
+
+Credenciales: `minioadmin` / `minioadmin` son solo para desarrollo local; no
+usar estos valores fuera del laboratorio. La consola de administración queda
+en `http://localhost:9001` con las mismas credenciales.
+
+### Crear el bucket de pruebas
+
+El operador crea el bucket antes de subir o leer nada; ni `generar.py` ni
+`lector.py` lo crean automáticamente. Con el cliente de `boto3` ya instalado
+en el entorno del proyecto:
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_DEFAULT_REGION=us-east-1 \
+uv run --locked python -c "
+import boto3
+from botocore.config import Config
+cliente = boto3.client('s3', endpoint_url='http://localhost:9000',
+                        config=Config(s3={'addressing_style': 'path'}))
+cliente.create_bucket(Bucket='logs')
+print(cliente.list_buckets()['Buckets'])
+"
+```
+
+### Variables de entorno compartidas
+
+Ver PROJECT_STATEMENT §12.4. Flags explícitos de cada comando prevalecen sobre
+estas variables, y estas sobre los defaults del código:
+
+| Variable | Default usado por LogHunter | Uso |
+|---|---|---|
+| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Broker de Celery (coordinador y workers) |
+| `CELERY_RESULT_BACKEND` | `redis://localhost:6379/1` | Backend de resultados de Celery |
+| `S3_ENDPOINT` | `http://localhost:9000` | Endpoint S3 de MinIO |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | sin default: deben definirse | Credenciales de `boto3`; nunca se versionan ni se imprimen en logs |
+| `AWS_DEFAULT_REGION` | `us-east-1` | Región exigida por la API S3, sin significado real en MinIO |
+| `LOGHUNTER_TASK_TIME_LIMIT` | `120` (segundos) | Límite duro de una tarea Celery |
+| `LOGHUNTER_VISIBILITY_TIMEOUT` | `180` (segundos) | `visibility_timeout` del broker Redis |
+| `LOGHUNTER_RESULT_EXPIRES` | `3600` (segundos) | Retención de resultados en el backend |
+
+### Limpiar
+
+```bash
+docker rm -f loghunter-redis loghunter-minio
+```
+
+Sin volumen montado, los datos de MinIO se pierden al eliminar el contenedor;
+eso es aceptable para desarrollo. El despliegue del issue #24 sí define
+volúmenes persistentes (PROJECT_STATEMENT §14).

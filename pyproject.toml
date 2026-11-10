@@ -8,14 +8,20 @@ version = "0.1.0"
 description = "Analizador distribuido de logs para Computación II"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "boto3>=1.34,<2",
+    "celery[redis]>=5.4,<6",
+]
 
 [project.urls]
 Repository = "https://github.com/manudiiez/umcomp2_final"
 Issues = "https://github.com/manudiiez/umcomp2_final/issues"
 
 [dependency-groups]
-dev = ["pytest>=8.4,<10"]
+dev = [
+    "moto[s3]>=5.0,<6",
+    "pytest>=8.4,<10",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
