@@ -198,5 +198,104 @@ docker rm -f loghunter-redis loghunter-minio
 ```
 
 Sin volumen montado, los datos de MinIO se pierden al eliminar el contenedor;
-eso es aceptable para desarrollo. El despliegue del issue #24 sí define
-volúmenes persistentes (PROJECT_STATEMENT §14).
+eso es aceptable para desarrollo. El despliegue de Compose de la sección
+siguiente sí define volúmenes persistentes (PROJECT_STATEMENT §14).
+
+## Despliegue con Docker Compose
+
+`docker-compose.yml` (issue #24, PROJECT_STATEMENT §14, ADR-0012) define
+`redis`, `minio`, `coordinador` y `worker` a partir de una única imagen
+(`Dockerfile`, Python 3.12 + el proyecto instalado en modo editable). El
+**indexador no es un servicio**: es el proceso hijo que el propio
+coordinador lanza con `multiprocessing` dentro de su contenedor, igual que en
+desarrollo local. Volúmenes propios para los datos de MinIO (`minio-data`) y
+el SQLite del coordinador (`sqlite-data`); Redis no tiene volumen a
+propósito, porque el proyecto no promete que la cola sobreviva a su pérdida
+(ADR-0012, PROJECT_STATEMENT §14).
+
+```bash
+docker compose build
+docker compose up -d --scale worker=4
+docker compose ps   # las cuatro réplicas de worker y los tres servicios "healthy"
+```
+
+`--scale worker=4` replica el *contenedor* worker en **este host**; con
+`-c 4` en cada réplica (fijado en el `command` del servicio) son 16 procesos
+Celery totales, no 4 — PROJECT_STATEMENT §14 pide distinguir ambos números.
+No simula varias máquinas: para eso hace falta un worker en otro host (ver
+más abajo).
+
+### Bucket y credenciales
+
+Igual que en desarrollo manual, **el operador crea el bucket**; Compose no lo
+hace por su cuenta:
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_DEFAULT_REGION=us-east-1 \
+uv run --locked python -c "
+import boto3
+from botocore.config import Config
+boto3.client('s3', endpoint_url='http://localhost:9000',
+              config=Config(s3={'addressing_style': 'path'})).create_bucket(Bucket='logs')
+"
+```
+
+`minioadmin`/`minioadmin` son el default de desarrollo (variables
+`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` del archivo Compose, sobreescribibles
+por entorno); no usar estos valores fuera del laboratorio. Puertos: `8888`
+coordinador, `6379` Redis, `9000` API S3 de MinIO, `9001` consola de
+administración.
+
+### Ejecutar una consulta completa (AC-17)
+
+El cliente corre fuera de Compose, contra el puerto publicado del
+coordinador — igual que contra los contenedores manuales de la sección
+anterior:
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_DEFAULT_REGION=us-east-1 S3_ENDPOINT=http://localhost:9000 \
+uv run --locked python -m loghunter.generar -o s3://logs/demo.log --size-mb 4 --seed 7
+
+uv run --locked python -m loghunter.cliente -i 127.0.0.1 -p 8888 \
+  --file s3://logs/demo.log --query top-ips --top 5
+```
+
+Verificado en un checkout limpio (2026-11-10): el pedido se resolvió con un
+worker real en su propio contenedor, sin compartir el archivo por
+filesystem con el coordinador (`docker compose exec worker sh -c "find / \
+-xdev -iname '*.log'"` solo encuentra logs del sistema, ninguno del
+proyecto). `docker compose exec coordinador python -c "..."` contra
+`/data/informes.sqlite` confirmó el informe persistido.
+
+### Datos persistentes al recrear
+
+```bash
+docker compose down        # sin -v: los volúmenes no se tocan
+docker compose up -d --scale worker=4
+```
+
+Verificado: el mismo informe seguía en `/data/informes.sqlite` dentro del
+coordinador y el mismo objeto seguía en el bucket de MinIO después de
+recrear los contenedores sin borrar volúmenes (AC-17). `docker compose down
+-v` sí los borra; es una acción explícita del operador, no el flujo normal.
+
+### Worker externo en otro host
+
+Compose por sí solo no demuestra distribución entre máquinas (solo replica
+contenedores en un host). Para un worker real en otro host, alcanzable por
+red hacia este mismo Redis/MinIO:
+
+```bash
+docker build -t loghunter:local .
+docker run -d --name loghunter-worker-externo \
+  -e CELERY_BROKER_URL=redis://<host-de-este-compose>:6379/0 \
+  -e CELERY_RESULT_BACKEND=redis://<host-de-este-compose>:6379/1 \
+  -e S3_ENDPOINT=http://<host-de-este-compose>:9000 \
+  -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin -e AWS_DEFAULT_REGION=us-east-1 \
+  loghunter:local celery -A loghunter.tasks worker --loglevel=INFO -c 2 -n externo@%h
+```
+
+Mismo mecanismo que el worker en contenedor separado documentado en
+[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md), ahora
+alcanzando los puertos publicados por Compose en vez de los contenedores
+manuales de desarrollo.
