@@ -22,6 +22,7 @@ _S3_CONNECT_TIMEOUT = 5
 _S3_READ_TIMEOUT = 15
 _S3_MAX_REINTENTOS = 3
 _S3_BACKOFF_BASE = 0.2  # segundos; crece 0.2, 0.4, 0.8
+_S3_LECTURA_ADELANTADA = 512 * 1024  # bytes por GET cacheados en leer_hasta_salto (issue #53)
 
 
 class AlmacenamientoNoDisponible(Exception):
@@ -153,6 +154,8 @@ class LectorS3:
         self._tamano = self._operacion_con_reintentos(
             lambda: self._cliente.head_object(Bucket=self._bucket, Key=self._key)
         )["ContentLength"]
+        self._cache_inicio = 0
+        self._cache_datos = b""
 
     def tamano(self) -> int:
         """Tamaño del objeto en bytes, obtenido una sola vez al abrir (`HEAD`)."""
@@ -182,8 +185,37 @@ class LectorS3:
         return datos
 
     def leer_hasta_salto(self, desde: int, max_bytes: int) -> bytes:
-        """Lee hasta el primer LF inclusive, o hasta `max_bytes`/EOF si no aparece."""
-        return _leer_hasta_salto_generico(self, desde, max_bytes)
+        """Lee hasta el primer LF inclusive, o hasta `max_bytes`/EOF si no aparece.
+
+        A diferencia de `LectorLocal` (`mmap`: relecturas superpuestas son
+        gratis vía el page cache del kernel), acá cada lectura nueva es un
+        `GET Range` HTTP real. `_lineas_del_tramo` llama a este método una
+        vez por línea con un cursor que avanza por el tramo; sin cachear,
+        un tramo de muchas líneas cortas dispararía una petición nueva por
+        línea, descartando casi todo lo traído (issue #53). Se cachea el
+        último bloque de `_S3_LECTURA_ADELANTADA` bytes y se reutiliza
+        mientras el cursor siga dentro de él.
+        """
+        limite_absoluto = min(desde + max_bytes, self._tamano)
+        ventana = limite_absoluto - desde
+        if ventana <= 0:
+            return b""
+
+        cache_cubre = (
+            self._cache_inicio <= desde
+            and desde + ventana <= self._cache_inicio + len(self._cache_datos)
+        )
+        if not cache_cubre:
+            objetivo = min(desde + max(max_bytes, _S3_LECTURA_ADELANTADA), self._tamano)
+            self._cache_datos = self.leer(desde, objetivo)
+            self._cache_inicio = desde
+
+        offset = desde - self._cache_inicio
+        disponible = self._cache_datos[offset : offset + ventana]
+        indice = disponible.find(b"\n")
+        if indice == -1:
+            return disponible
+        return disponible[: indice + 1]
 
     def cerrar(self) -> None:
         """Cierra el cliente HTTP subyacente. Idempotente."""

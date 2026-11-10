@@ -177,6 +177,34 @@ def test_leer_hasta_salto_sin_lf_devuelve_hasta_limite_o_eof(
         assert l.leer_hasta_salto(14, 4) == b"line"
 
 
+def test_leer_hasta_salto_muchas_lineas_cortas_no_dispara_un_get_por_linea(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue #53: sin el búfer de lectura adelantada, cada línea dispararía su
+    propio `GET Range`. El contenido cruza al menos un límite de
+    `_S3_LECTURA_ADELANTADA` (512 KiB) para ejercitar también la recarga del
+    búfer, no solo el caso de un único bloque."""
+    import loghunter.lector as lector_mod
+
+    contenido = b"x\n" * 300_000  # 600 000 bytes, 300 000 líneas de 2 bytes
+    fake = _ClienteFakeS3({(_BUCKET, _KEY): contenido})
+    monkeypatch.setattr(lector_mod, "cliente_s3", lambda: fake)
+
+    with lector.abrir(f"s3://{_BUCKET}/{_KEY}") as l:
+        cursor = 0
+        lineas = 0
+        while cursor < len(contenido):
+            bloque = l.leer_hasta_salto(cursor, 64 * 1024)
+            assert bloque
+            cursor += len(bloque)
+            lineas += 1
+
+    assert lineas == 300_000
+    assert fake.llamadas_get <= 5, (
+        f"se esperaban pocas peticiones (bloques de 512 KiB), hubo {fake.llamadas_get}"
+    )
+
+
 def test_rango_fuera_del_objeto_es_rechazado(monkeypatch: pytest.MonkeyPatch) -> None:
     with _abrir_con_fake(monkeypatch, {(_BUCKET, _KEY): _CONTENIDO}) as l:
         with pytest.raises(ValueError):
