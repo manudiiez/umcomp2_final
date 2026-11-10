@@ -3,6 +3,9 @@
 Genera por bloques, sin acumular el archivo completo en memoria. La misma
 semilla y los mismos argumentos producen exactamente los mismos bytes; una
 fecha base fija y un PRNG local evitan depender de la hora de ejecución.
+La subida a `s3://` reusa `lector.cliente_s3()` (misma configuración de
+endpoint/timeouts que usan los workers) y sube con `upload_fileobj`, que
+lee en bloques acotados: nunca junta el archivo completo en memoria.
 """
 
 from __future__ import annotations
@@ -16,6 +19,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from botocore.exceptions import ClientError
+
+from loghunter.lector import AlmacenamientoNoDisponible, cliente_s3, normalizar_uri_s3
 from loghunter.parser import parsear_linea
 
 _MESES_INGLES = (
@@ -94,13 +100,19 @@ def escribir_log(
     corrupt_pct: float = 0.0,
     seed: int | None = None,
 ) -> ResultadoGeneracion:
-    """Escribe el log generado en `destino` (solo rutas locales en esta etapa)."""
-    ruta = _validar_destino_local(destino)
+    """Escribe el log generado en `destino`: ruta/`local://` o `s3://bucket/key`."""
+    lineas = generar_log(size_mb=size_mb, ips=ips, corrupt_pct=corrupt_pct, seed=seed)
+    if urlsplit(destino).scheme == "s3":
+        return _escribir_log_s3(destino, lineas)
+    return _escribir_log_local(_validar_destino_local(destino), lineas)
+
+
+def _escribir_log_local(ruta: Path, lineas: Iterator[bytes]) -> ResultadoGeneracion:
     tamano = 0
     validas = 0
     invalidas = 0
     with open(ruta, "wb") as archivo:
-        for linea in generar_log(size_mb=size_mb, ips=ips, corrupt_pct=corrupt_pct, seed=seed):
+        for linea in lineas:
             archivo.write(linea)
             tamano += len(linea)
             if parsear_linea(linea) is None:
@@ -108,6 +120,61 @@ def escribir_log(
             else:
                 validas += 1
     return ResultadoGeneracion(tamano_bytes=tamano, validas=validas, invalidas=invalidas)
+
+
+class _FlujoGenerado:
+    """Adapta un generador de líneas a la interfaz `.read(size)` de `upload_fileobj`.
+
+    Nunca junta el archivo completo en memoria: el buffer solo contiene,
+    en el peor caso, una línea de más que lo ya devuelto. Cuenta
+    tamaño/válidas/inválidas al vuelo, en la misma pasada que sube los
+    bytes, sin regenerar el stream para contarlas aparte.
+    """
+
+    def __init__(self, lineas: Iterator[bytes]) -> None:
+        self._lineas = lineas
+        self._buffer = bytearray()
+        self.tamano = 0
+        self.validas = 0
+        self.invalidas = 0
+
+    def read(self, size: int = -1) -> bytes:
+        while size < 0 or len(self._buffer) < size:
+            try:
+                linea = next(self._lineas)
+            except StopIteration:
+                break
+            self.tamano += len(linea)
+            if parsear_linea(linea) is None:
+                self.invalidas += 1
+            else:
+                self.validas += 1
+            self._buffer.extend(linea)
+        if size < 0 or size >= len(self._buffer):
+            datos, self._buffer = bytes(self._buffer), bytearray()
+        else:
+            datos, self._buffer = bytes(self._buffer[:size]), self._buffer[size:]
+        return datos
+
+
+def _escribir_log_s3(destino: str, lineas: Iterator[bytes]) -> ResultadoGeneracion:
+    bucket, key = normalizar_uri_s3(destino)
+    flujo = _FlujoGenerado(lineas)
+    cliente = cliente_s3()
+    try:
+        cliente.upload_fileobj(flujo, bucket, key)
+    except ClientError as error:
+        codigo = error.response.get("Error", {}).get("Code", "")
+        if codigo in ("NoSuchBucket", "404"):
+            raise FileNotFoundError(
+                f"No existe el bucket S3 '{bucket}'; debe crearlo el operador antes de subir"
+            ) from error
+        raise
+    finally:
+        cliente.close()
+    return ResultadoGeneracion(
+        tamano_bytes=flujo.tamano, validas=flujo.validas, invalidas=flujo.invalidas
+    )
 
 
 def _validar_argumentos(size_mb: int, ips: int, corrupt_pct: float) -> None:
@@ -121,8 +188,6 @@ def _validar_argumentos(size_mb: int, ips: int, corrupt_pct: float) -> None:
 
 def _validar_destino_local(destino: str) -> Path:
     partes = urlsplit(destino)
-    if partes.scheme == "s3":
-        raise NotImplementedError("Destino s3:// todavía no soportado; ver issue #12")
     if partes.scheme in ("", "local"):
         ruta = partes.path if partes.scheme == "local" else destino
         return Path(ruta).expanduser()
@@ -177,7 +242,7 @@ def _construir_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-o", "--out", required=True,
-        help="Destino: ruta local, local://... (s3://bucket/key pendiente del issue #12)",
+        help="Destino: ruta local, local://... o s3://bucket/key (el bucket debe existir)",
     )
     parser.add_argument(
         "--size-mb", required=True, type=int,
@@ -208,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
             corrupt_pct=args.corrupt_pct,
             seed=args.seed,
         )
-    except (ValueError, NotImplementedError) as error:
+    except (ValueError, FileNotFoundError, AlmacenamientoNoDisponible, ClientError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
     print(
