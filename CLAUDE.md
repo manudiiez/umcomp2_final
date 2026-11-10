@@ -10,11 +10,15 @@ de sockets concurrentes, IPC, asincronismo de I/O y colas de tareas distribuidas
 por lo que **los mecanismos elegidos son el objeto de la evaluación**, no solo el
 resultado funcional.
 
-**Estado actual: base Python iniciada.** El paquete está en `src/loghunter`, con
-módulos reservados e importación sin servicios. El entorno se prepara con
-`uv sync --locked --python 3.12` y las pruebas con `uv run --locked python -m pytest`.
-Consultar `INSTALL.md`; las funcionalidades de análisis todavía están pendientes.
-La especificación, los casos de uso y los ADR están en `doc/`.
+**Estado actual: los seis milestones de `doc/DEVELOPMENT_PLAN.md` están
+implementados y verificados con infraestructura real** (núcleo local,
+distribución con Celery/Redis/MinIO, cliente-servidor `asyncio`,
+persistencia/IPC/señales, Docker Compose, benchmark); pendiente la promoción
+de `develop` a `main` y la revisión final del issue #28. El entorno se
+prepara con `uv sync --locked --python 3.12` y las pruebas con
+`uv run --locked python -m pytest`. Consultar `INSTALL.md` para el
+despliegue completo y `doc/VERIFICACION_*.md` para la evidencia real de cada
+etapa. La especificación, los casos de uso y los ADR están en `doc/`.
 
 La documentación y los mensajes de commit están en **castellano**.
 
@@ -162,12 +166,16 @@ Consultas soportadas: `top-ips`, `status`, `urls`, `traffic`.
   exige explícitamente para los ajustes acordados con el profesor.
 - Mensajes de commit en castellano, en imperativo, con el detalle en el cuerpo.
 
-## Pendientes del repositorio
+## Entregables de la cátedra
 
-`FINAL.md` exige estos archivos para la presentación final:
+`FINAL.md` exige estos archivos para la presentación final; los cuatro están
+completos desde el issue #27 (milestone 6) y se mantienen junto al código:
 
-- `INSTALL.md` — existe para la base Python; ampliar con servicios y despliegue.
-- `INFO.md` — decisiones de diseño y su justificación.
-- `TODO.md` — mejoras y features futuras. Arrancar desde las exclusiones de
+- `INSTALL.md` — entorno, servicios, despliegue con Compose y workers remotos.
+- `INFO.md` — decisiones de diseño y su justificación, enlazando los ADR.
+- `TODO.md` — mejoras y features futuras, partiendo de las exclusiones de
   `doc/PROJECT_STATEMENT.md` §3.2.
-- `README.md` — ampliar con ayuda y uso básico (hoy es solo una portada).
+- `README.md` — portada, estado, documentación y uso básico.
+
+Si un cambio posterior afecta alcance, decisiones o instalación, actualizar
+el archivo correspondiente en el mismo PR que introduce el cambio.
