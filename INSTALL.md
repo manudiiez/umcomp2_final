@@ -2,27 +2,27 @@
 
 ## Estado actual
 
-El milestone 2 implementó el núcleo de análisis local: `loghunter.parser`,
-`loghunter.consultas`, `loghunter.generar`, `loghunter.lector` (backend
-`local://`) y `loghunter.workers` (map-reduce por tramos en memoria), con
-pruebas que comparan el resultado por tramos contra una referencia
-secuencial (ver [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md)).
+Los seis milestones de `doc/DEVELOPMENT_PLAN.md` están implementados y
+verificados con infraestructura real:
 
-El milestone 3 agregó la distribución remota: `loghunter.tasks` (tarea
-Celery `map_chunk` sobre Redis), el backend `s3://` de `loghunter.lector` y
-la subida de logs a MinIO en `loghunter.generar`, y `loghunter.analisis`
-(correlación de grupos de tareas y reduce de parciales). Verificado con
-Redis, MinIO y workers Celery reales, incluyendo un worker sin acceso al
-filesystem del log y la recuperación tras perder un worker (ver
-[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md)).
+| Milestone | Qué agrega | Evidencia |
+|---|---|---|
+| 2 — núcleo local | `parser`, `consultas`, `generar`, `lector` (`local://`), `workers` (map-reduce en memoria) | [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md) |
+| 3 — distribución remota | `tasks` (Celery/Redis), backend `s3://`, subida a MinIO, `analisis` (correlación y reduce) | [VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md) |
+| 4 — cliente-servidor | `protocolo` (TCP/JSON por LF), `coordinador` (`asyncio`), `cliente` (CLI) | `tests/test_protocolo.py`, `tests/test_coordinador.py`, `tests/test_cliente.py` |
+| 5 — persistencia e IPC | `indexador` (proceso hijo, SQLite), `ipc.Metricas`, señales y apagado ordenado | `tests/test_indexador.py`, `tests/test_ipc.py`, `tests/test_operacion.py` |
+| 6 — integración y entrega | Fallos reales, Docker Compose, benchmark, documentación final | [VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md), [VERIFICACION_INTEGRACION.md](doc/VERIFICACION_INTEGRACION.md), [VERIFICACION_BENCHMARK.md](doc/VERIFICACION_BENCHMARK.md) |
 
-`cliente.py`, `coordinador.py` e `indexador.py` siguen con su ubicación
-reservada: su ejecución informa que todavía no están implementados y
-termina con error; no inician servicios ni simulan un análisis exitoso.
+`cliente.py`, `coordinador.py` e `indexador.py` ya no son solo ubicación
+reservada: forman la aplicación cliente-servidor real (ver
+[GUIA_DEMO.md](doc/GUIA_DEMO.md) para un recorrido ejecutable de punta a
+punta).
 
-Los requisitos y futuras funcionalidades están en
-[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), y el orden de implementación en
-[DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md).
+El contrato de implementación está en
+[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md); el orden en que se construyó,
+en [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md); las decisiones y su
+justificación, en [INFO.md](INFO.md); lo explícitamente fuera de alcance, en
+[TODO.md](TODO.md).
 
 ## Requisitos
 
@@ -40,13 +40,13 @@ Utilizar una versión de mantenimiento actualizada de CPython 3.12.
 ```bash
 git clone https://github.com/manudiiez/umcomp2_final.git
 cd umcomp2_final
-# Hasta integrar esta etapa en main, seleccionar la rama que contiene este issue.
-git switch build/2-estructura-proyecto
+# Mientras la entrega no esté promovida a main (ver doc/DEVELOPMENT_PLAN.md),
+# develop tiene la implementación completa de los seis milestones.
+git switch develop
 uv sync --locked --python 3.12
 ```
 
-Al estar el cambio integrado en otra rama, seleccionar esa rama en lugar de la
-del ejemplo. El comando instala el proyecto en modo editable y las herramientas
+El comando instala el proyecto en modo editable y las herramientas
 del grupo `dev`, con las versiones exactas de `uv.lock`. El entorno `.venv/` es
 local y no se versiona. Para usar un intérprete concreto:
 
@@ -116,9 +116,10 @@ La instalación y la mayoría de las pruebas (incluidas las del backend S3, que
 usan `moto` para simular MinIO en memoria) no necesitan Redis, MinIO ni Docker.
 Son necesarios solo para la ejecución real de tareas distribuidas (issues
 #10, #13 y #14) y para `python -m loghunter.generar -o s3://...` contra un
-MinIO real. Este milestone **no** instala Docker Compose todavía (eso es el
-issue #24): los siguientes comandos arrancan cada servicio por separado, para
-desarrollo en un solo host.
+MinIO real. Los siguientes comandos arrancan cada servicio por separado, útil
+para desarrollo iterativo en un solo host; para un despliegue completo con
+`docker-compose.yml` (coordinador y worker incluidos), ver "Despliegue con
+Docker Compose" más abajo.
 
 ### Redis (broker y backend de resultados)
 
@@ -198,5 +199,104 @@ docker rm -f loghunter-redis loghunter-minio
 ```
 
 Sin volumen montado, los datos de MinIO se pierden al eliminar el contenedor;
-eso es aceptable para desarrollo. El despliegue del issue #24 sí define
-volúmenes persistentes (PROJECT_STATEMENT §14).
+eso es aceptable para desarrollo. El despliegue de Compose de la sección
+siguiente sí define volúmenes persistentes (PROJECT_STATEMENT §14).
+
+## Despliegue con Docker Compose
+
+`docker-compose.yml` (issue #24, PROJECT_STATEMENT §14, ADR-0012) define
+`redis`, `minio`, `coordinador` y `worker` a partir de una única imagen
+(`Dockerfile`, Python 3.12 + el proyecto instalado en modo editable). El
+**indexador no es un servicio**: es el proceso hijo que el propio
+coordinador lanza con `multiprocessing` dentro de su contenedor, igual que en
+desarrollo local. Volúmenes propios para los datos de MinIO (`minio-data`) y
+el SQLite del coordinador (`sqlite-data`); Redis no tiene volumen a
+propósito, porque el proyecto no promete que la cola sobreviva a su pérdida
+(ADR-0012, PROJECT_STATEMENT §14).
+
+```bash
+docker compose build
+docker compose up -d --scale worker=4
+docker compose ps   # las cuatro réplicas de worker y los tres servicios "healthy"
+```
+
+`--scale worker=4` replica el *contenedor* worker en **este host**; con
+`-c 4` en cada réplica (fijado en el `command` del servicio) son 16 procesos
+Celery totales, no 4 — PROJECT_STATEMENT §14 pide distinguir ambos números.
+No simula varias máquinas: para eso hace falta un worker en otro host (ver
+más abajo).
+
+### Bucket y credenciales
+
+Igual que en desarrollo manual, **el operador crea el bucket**; Compose no lo
+hace por su cuenta:
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_DEFAULT_REGION=us-east-1 \
+uv run --locked python -c "
+import boto3
+from botocore.config import Config
+boto3.client('s3', endpoint_url='http://localhost:9000',
+              config=Config(s3={'addressing_style': 'path'})).create_bucket(Bucket='logs')
+"
+```
+
+`minioadmin`/`minioadmin` son el default de desarrollo (variables
+`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` del archivo Compose, sobreescribibles
+por entorno); no usar estos valores fuera del laboratorio. Puertos: `8888`
+coordinador, `6379` Redis, `9000` API S3 de MinIO, `9001` consola de
+administración.
+
+### Ejecutar una consulta completa (AC-17)
+
+El cliente corre fuera de Compose, contra el puerto publicado del
+coordinador — igual que contra los contenedores manuales de la sección
+anterior:
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_DEFAULT_REGION=us-east-1 S3_ENDPOINT=http://localhost:9000 \
+uv run --locked python -m loghunter.generar -o s3://logs/demo.log --size-mb 4 --seed 7
+
+uv run --locked python -m loghunter.cliente -i 127.0.0.1 -p 8888 \
+  --file s3://logs/demo.log --query top-ips --top 5
+```
+
+Verificado en un checkout limpio (2026-11-10): el pedido se resolvió con un
+worker real en su propio contenedor, sin compartir el archivo por
+filesystem con el coordinador (`docker compose exec worker sh -c "find / \
+-xdev -iname '*.log'"` solo encuentra logs del sistema, ninguno del
+proyecto). `docker compose exec coordinador python -c "..."` contra
+`/data/informes.sqlite` confirmó el informe persistido.
+
+### Datos persistentes al recrear
+
+```bash
+docker compose down        # sin -v: los volúmenes no se tocan
+docker compose up -d --scale worker=4
+```
+
+Verificado: el mismo informe seguía en `/data/informes.sqlite` dentro del
+coordinador y el mismo objeto seguía en el bucket de MinIO después de
+recrear los contenedores sin borrar volúmenes (AC-17). `docker compose down
+-v` sí los borra; es una acción explícita del operador, no el flujo normal.
+
+### Worker externo en otro host
+
+Compose por sí solo no demuestra distribución entre máquinas (solo replica
+contenedores en un host). Para un worker real en otro host, alcanzable por
+red hacia este mismo Redis/MinIO:
+
+```bash
+docker build -t loghunter:local .
+docker run -d --name loghunter-worker-externo \
+  -e CELERY_BROKER_URL=redis://<host-de-este-compose>:6379/0 \
+  -e CELERY_RESULT_BACKEND=redis://<host-de-este-compose>:6379/1 \
+  -e S3_ENDPOINT=http://<host-de-este-compose>:9000 \
+  -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin -e AWS_DEFAULT_REGION=us-east-1 \
+  loghunter:local celery -A loghunter.tasks worker --loglevel=INFO -c 2 -n externo@%h
+```
+
+Mismo mecanismo que el worker en contenedor separado documentado en
+[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md), ahora
+alcanzando los puertos publicados por Compose en vez de los contenedores
+manuales de desarrollo.

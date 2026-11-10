@@ -1,6 +1,8 @@
 # LogHunter — casos de uso
 
-Fecha: 2026-11-02. Estado: comportamiento esperado, todavía sin implementar.
+Fecha: 2026-11-02 (actualizado 2026-11-10). Estado: comportamiento esperado,
+implementado y verificado — la matriz de evidencia por criterio de aceptación
+está en `doc/VERIFICACION_INTEGRACION.md`.
 Especificación normativa: [PROJECT_STATEMENT.md](PROJECT_STATEMENT.md).
 Decisiones y fundamentos: [adr/INDEX.md](adr/INDEX.md).
 

@@ -1,6 +1,11 @@
 # LogHunter — especificación del proyecto
 
-Fecha: 2026-11-02. Estado: desarrollo iniciado con la base Python; funcionalidades pendientes.
+Fecha: 2026-11-02 (actualizado 2026-11-10). Estado: los seis milestones de
+`DEVELOPMENT_PLAN.md` están implementados y verificados con infraestructura
+real (ver `INSTALL.md` y los `VERIFICACION_*.md` de `doc/`); pendiente la
+promoción de `develop` a `main` y la revisión final del issue #28. Este
+documento sigue siendo el contrato de implementación, no un registro de
+avance.
 
 ## 1. Propósito y autoridad del documento
 
