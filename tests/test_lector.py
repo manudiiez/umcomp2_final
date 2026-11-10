@@ -93,9 +93,9 @@ def test_cerrar_es_idempotente(tmp_path: Path) -> None:
     l.cerrar()  # no debe lanzar ni volver a cerrar el mismo fd
 
 
-def test_backend_s3_no_soportado_todavia() -> None:
+def test_backend_desconocido_es_rechazado() -> None:
     with pytest.raises(ValueError):
-        lector.abrir("s3://logs/access.log")
+        lector.abrir("ftp://logs/access.log")
 
 
 def test_normalizar_uri_local_acepta_ruta_plana_y_local_scheme(tmp_path: Path) -> None:
