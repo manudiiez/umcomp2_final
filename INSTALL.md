@@ -7,9 +7,18 @@ El milestone 2 implementó el núcleo de análisis local: `loghunter.parser`,
 `local://`) y `loghunter.workers` (map-reduce por tramos en memoria), con
 pruebas que comparan el resultado por tramos contra una referencia
 secuencial (ver [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md)).
-`cliente.py`, `coordinador.py`, `tasks.py` e `indexador.py` siguen con su
-ubicación reservada: su ejecución informa que todavía no están implementados
-y termina con error; no inician servicios ni simulan un análisis exitoso.
+
+El milestone 3 agregó la distribución remota: `loghunter.tasks` (tarea
+Celery `map_chunk` sobre Redis), el backend `s3://` de `loghunter.lector` y
+la subida de logs a MinIO en `loghunter.generar`, y `loghunter.analisis`
+(correlación de grupos de tareas y reduce de parciales). Verificado con
+Redis, MinIO y workers Celery reales, incluyendo un worker sin acceso al
+filesystem del log y la recuperación tras perder un worker (ver
+[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md)).
+
+`cliente.py`, `coordinador.py` e `indexador.py` siguen con su ubicación
+reservada: su ejecución informa que todavía no están implementados y
+termina con error; no inician servicios ni simulan un análisis exitoso.
 
 Los requisitos y futuras funcionalidades están en
 [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), y el orden de implementación en
