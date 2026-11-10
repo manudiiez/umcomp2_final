@@ -24,6 +24,7 @@ en [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md), acompañada por los casos d
 | [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md) | Objetivo, alcance, tecnologías, arquitectura, contratos, ejemplos y aceptación |
 | [USE_CASES.md](doc/USE_CASES.md) | Casos de uso con flujos, alternativas y resultados esperados |
 | [Plan de desarrollo](doc/DEVELOPMENT_PLAN.md) | Etapas técnicas, issues de GitHub y dependencias para avanzar paso a paso |
+| [Resumen del milestone 2](doc/RESUMEN_MILESTONE_2.md) | Qué se hizo y en qué archivo, por módulo del núcleo local |
 | [Verificación del núcleo](doc/VERIFICACION_NUCLEO.md) | Comandos y resultados reales de la verificación local (milestone 2) |
 | [Índice de ADR](doc/adr/INDEX.md) | Decisiones de arquitectura y desarrollo, alternativas y consecuencias |
 | [Skill de GitHub](.claude/skills/flujo-github/SKILL.md) | Conventional Commits y PRs de issue a milestone, develop y main |
