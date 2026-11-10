@@ -113,7 +113,7 @@ def normalizar_uri_s3(uri: str) -> tuple[str, str]:
     return bucket, key
 
 
-def _cliente_s3() -> "boto3.client":
+def cliente_s3() -> "boto3.client":
     endpoint = os.environ.get("S3_ENDPOINT", "http://localhost:9000")
     region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
     config = Config(
@@ -148,7 +148,7 @@ class LectorS3:
     def __init__(self, uri: str) -> None:
         self.uri = uri
         self._bucket, self._key = normalizar_uri_s3(uri)
-        self._cliente = _cliente_s3()
+        self._cliente = cliente_s3()
         self._cerrado = False
         self._tamano = self._operacion_con_reintentos(
             lambda: self._cliente.head_object(Bucket=self._bucket, Key=self._key)

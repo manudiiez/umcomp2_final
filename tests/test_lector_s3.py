@@ -92,7 +92,7 @@ class _ClienteAccesoDenegado:
 def _abrir_con_fake(monkeypatch: pytest.MonkeyPatch, objetos: dict[tuple[str, str], bytes]):
     import loghunter.lector as lector_mod
 
-    monkeypatch.setattr(lector_mod, "_cliente_s3", lambda: _ClienteFakeS3(objetos))
+    monkeypatch.setattr(lector_mod, "cliente_s3", lambda: _ClienteFakeS3(objetos))
     return lector.abrir(f"s3://{_BUCKET}/{_KEY}")
 
 
@@ -127,7 +127,7 @@ def test_cliente_s3_usa_endpoint_region_y_direccionamiento_por_path(
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "x")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "y")
 
-    cliente = lector_mod._cliente_s3()
+    cliente = lector_mod.cliente_s3()
 
     assert cliente.meta.endpoint_url == "http://minio.local:9000"
     assert cliente.meta.region_name == "sa-east-1"
@@ -157,7 +157,7 @@ def test_leer_rango_vacio_no_llama_a_get_object(monkeypatch: pytest.MonkeyPatch)
     import loghunter.lector as lector_mod
 
     fake = _ClienteFakeS3({(_BUCKET, _KEY): _CONTENIDO})
-    monkeypatch.setattr(lector_mod, "_cliente_s3", lambda: fake)
+    monkeypatch.setattr(lector_mod, "cliente_s3", lambda: fake)
     with lector.abrir(f"s3://{_BUCKET}/{_KEY}") as l:
         l.leer(3, 3)
     assert fake.llamadas_get == 0
@@ -200,7 +200,7 @@ def test_cerrar_es_idempotente(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_objeto_inexistente_es_rechazado(monkeypatch: pytest.MonkeyPatch) -> None:
     import loghunter.lector as lector_mod
 
-    monkeypatch.setattr(lector_mod, "_cliente_s3", lambda: _ClienteFakeS3({}))
+    monkeypatch.setattr(lector_mod, "cliente_s3", lambda: _ClienteFakeS3({}))
     with pytest.raises(FileNotFoundError):
         lector.abrir(f"s3://{_BUCKET}/no-existe.log")
 
@@ -208,7 +208,7 @@ def test_objeto_inexistente_es_rechazado(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_acceso_denegado_es_rechazado(monkeypatch: pytest.MonkeyPatch) -> None:
     import loghunter.lector as lector_mod
 
-    monkeypatch.setattr(lector_mod, "_cliente_s3", lambda: _ClienteAccesoDenegado())
+    monkeypatch.setattr(lector_mod, "cliente_s3", lambda: _ClienteAccesoDenegado())
     with pytest.raises(PermissionError):
         lector.abrir(f"s3://{_BUCKET}/{_KEY}")
 
