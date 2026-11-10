@@ -19,8 +19,14 @@ procesamiento (`asyncio.wait(..., FIRST_COMPLETED)`): si el cliente cierra
 antes de terminar, se cancela el procesamiento, se revocan sus tareas
 pendientes y se libera el cupo (CU-22/AC-19), sin afectar otros jobs.
 
-La persistencia en SQLite (indexador, issues #20/#21) todavía no existe:
-`persistencia` en el `result` queda en un valor fijo hasta esa etapa.
+El coordinador encola el agregado completo (antes del recorte `top`) al
+indexador, proceso hijo que lanza él mismo (§6, issues #20/#21). Si ese hijo
+cae, `_supervisar_indexador` lo detecta y deja de admitir análisis nuevos con
+`SERVICE_UNAVAILABLE`; un job que ya estaba en curso falla con el mismo
+código al intentar persistir, en vez de anunciar un éxito que no se puede
+honrar (CU-23/AC-20). `ipc.Metricas` lleva los contadores compartidos con el
+indexador bajo `Value`+`Lock` (issue #21). El cierre ordenado por señales
+(`SIGINT`/`SIGTERM`/`SIGUSR1`, issue #22) vive en `_apagar`/`_emitir_snapshot`.
 """
 
 from __future__ import annotations
@@ -28,22 +34,25 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import multiprocessing
 import os
+import signal
 import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from loghunter import lector, protocolo
+from loghunter import ipc, lector, protocolo
 from loghunter.consultas import presentar
 from loghunter.workers import calcular_rangos
 
 logger = logging.getLogger(__name__)
 
 _MIB = 2**20
-_PERSISTENCIA_PENDIENTE = "no_implementada"  # se resuelve al integrar el indexador (#20/#21)
 _INTERVALO_PROGRESO = 1.0
+_INTERVALO_SUPERVISION = 2.0
+_PLAZO_CIERRE = 30.0
 
 LanzarGrupoFn = Callable[[str, int, int, str, str], Any]
 ReducirResultadosFn = Callable[[Any], dict[str, Any]]
@@ -63,6 +72,7 @@ class Job:
     completados: int = 0
     total: int = 0
     admitido_en: float | None = None
+    ts_utc: float | None = None
     deadline: float | None = None
 
 
@@ -89,6 +99,8 @@ class Coordinador:
         lanzar_grupo: LanzarGrupoFn | None = None,
         reducir_resultados: ReducirResultadosFn | None = None,
         tarea_fallida_exc: type[Exception] | None = None,
+        cola_informes: Any | None = None,
+        metricas: ipc.Metricas | None = None,
     ) -> None:
         if lanzar_grupo is None or reducir_resultados is None or tarea_fallida_exc is None:
             lanzar_grupo_real, reducir_resultados_real, tarea_fallida_real = _cargar_analisis()
@@ -106,6 +118,23 @@ class Coordinador:
         self._semaforo = asyncio.Semaphore(max_jobs)
         self._jobs: dict[str, Job] = {}
         self._lock = asyncio.Lock()
+
+        # Persistencia e IPC (issues #20/#21): `cola_informes`/`metricas` son
+        # inyectables para pruebas, igual que `lanzar_grupo`; en producción
+        # `iniciar_servicios` crea el indexador real si no llegaron ya armados.
+        self._cola_informes = cola_informes
+        self._metricas = metricas or ipc.Metricas()
+        self._proceso_indexador: multiprocessing.Process | None = None
+        self._servicio_disponible = True
+
+        # Conexiones activas (en cola o en ejecución) para el apagado ordenado
+        # (issue #22): cada entrada vive desde que se crea el job hasta que
+        # `atender_cliente` la retira en su `finally`, junto con `_jobs`.
+        self._conexiones: dict[str, tuple[Job, asyncio.StreamWriter, asyncio.Task[None]]] = {}
+        self._cerrando = False
+        self._server: asyncio.base_events.Server | None = None
+        self._evento_cierre: asyncio.Event | None = None
+        self._tarea_supervision: asyncio.Task[None] | None = None
 
     async def atender_cliente(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -128,6 +157,9 @@ class Coordinador:
             )
 
             procesar = asyncio.ensure_future(self._procesar_job(job, writer))
+            async with self._lock:
+                self._conexiones[job.id] = (job, writer, procesar)
+
             desconexion = asyncio.ensure_future(self._esperar_desconexion(reader))
             terminados, _ = await asyncio.wait(
                 {procesar, desconexion}, return_when=asyncio.FIRST_COMPLETED
@@ -143,6 +175,7 @@ class Coordinador:
             if job is not None:
                 async with self._lock:
                     self._jobs.pop(job.id, None)
+                    self._conexiones.pop(job.id, None)
             writer.close()
             try:
                 await writer.wait_closed()
@@ -162,6 +195,25 @@ class Coordinador:
             return
 
     async def _procesar_job(self, job: Job, writer: asyncio.StreamWriter) -> None:
+        if self._cerrando:
+            job.estado = "failed"
+            await self._enviar(
+                writer,
+                protocolo.msg_error(job.id, "SERVER_SHUTDOWN", "El coordinador se está apagando."),
+            )
+            return
+        if self._cola_informes is not None and not self._servicio_disponible:
+            job.estado = "failed"
+            await self._enviar(
+                writer,
+                protocolo.msg_error(
+                    job.id,
+                    "SERVICE_UNAVAILABLE",
+                    "El indexador no está disponible; no se admiten nuevos análisis.",
+                ),
+            )
+            return
+
         estado_inicial = "queued" if self._semaforo.locked() else "admitted"
         job.estado = "queued" if estado_inicial == "queued" else "validado"
         await self._enviar(writer, protocolo.msg_accepted(job.id, estado_inicial))
@@ -169,7 +221,9 @@ class Coordinador:
         await self._semaforo.acquire()
         job.estado = "running"
         job.admitido_en = time.monotonic()
+        job.ts_utc = time.time()
         job.deadline = job.admitido_en + self.job_timeout
+        self._metricas.incrementar_jobs_activos()
         async with self._lock:
             self._jobs[job.id] = job
 
@@ -194,12 +248,14 @@ class Coordinador:
                 return
             job.estado = "completed"
             await self._enviar(writer, resultado)
+            self._metricas.incrementar_informes_emitidos()
         except asyncio.CancelledError:
             job.estado = "cancelled"
             if job.grupo is not None:
                 await asyncio.to_thread(_revocar_grupo, job.grupo)
             raise
         finally:
+            self._metricas.decrementar_jobs_activos()
             self._semaforo.release()
 
     async def _ejecutar_analisis(self, job: Job, writer: asyncio.StreamWriter) -> dict[str, Any]:
@@ -238,9 +294,19 @@ class Coordinador:
                     "BROKER_UNAVAILABLE", f"Fallo de infraestructura reduciendo parciales: {exc}"
                 ) from exc
 
+        # "Reduce exitoso" ya ocurrió llegados a este punto (incluido el caso
+        # de archivo vacío); PROJECT_STATEMENT §11 exige contarlo una sola vez
+        # por job, independientemente de si la persistencia luego falla.
+        self._metricas.sumar_lineas_validas(reducido["lineas"])
+
         duracion = time.monotonic() - job.admitido_en
+        contador_total = Counter(reducido["contador"])
         top = job.top if job.query in ("top-ips", "urls") else None
-        resultados = presentar(job.query, Counter(reducido["contador"]), top)
+        resultados = presentar(job.query, contador_total, top)
+
+        persistencia = await self._persistir_informe(
+            job, tamano, reducido, contador_total, duracion
+        )
 
         return protocolo.msg_result(
             job.id,
@@ -256,8 +322,57 @@ class Coordinador:
             lineas_totales=reducido["lineas"] + reducido["invalidas"],
             duracion=duracion,
             resultados=[{"clave": clave, "valor": valor} for clave, valor in resultados],
-            persistencia=_PERSISTENCIA_PENDIENTE,
+            persistencia=persistencia,
         )
+
+    async def _persistir_informe(
+        self,
+        job: Job,
+        tamano: int,
+        reducido: dict[str, Any],
+        contador_total: Counter[str],
+        duracion: float,
+    ) -> str:
+        """Encola el agregado completo (antes del `top`) para el indexador.
+
+        Sin cola configurada no hay indexador en este `Coordinador` (modo de
+        prueba de la capa de jobs, issue #19): no es un fallo, es que esta
+        instancia no tiene persistencia conectada. Con cola configurada, un
+        indexador caído no se sigue intentando encolar indefinidamente sin
+        consumidor (CU-23): falla el job con `SERVICE_UNAVAILABLE` en vez de
+        anunciar un éxito que nunca se va a persistir.
+        """
+        if self._cola_informes is None:
+            return "no_configurada"
+        if not self._servicio_disponible:
+            raise protocolo.ErrorProtocolo(
+                "SERVICE_UNAVAILABLE",
+                "El indexador no está disponible; no se pudo persistir el informe.",
+            )
+
+        resultados_completos = presentar(job.query, contador_total, top=None)
+        informe = {
+            "job_id": job.id,
+            "ts": job.ts_utc,
+            "archivo": job.file,
+            "tamano_bytes": tamano,
+            "query": job.query,
+            "top": job.top,
+            "chunk_mb": job.chunk_mb,
+            "chunks": job.total,
+            "workers": reducido["workers"],
+            "lineas": reducido["lineas"],
+            "invalidas": reducido["invalidas"],
+            "duracion": duracion,
+            "resultados": [{"clave": clave, "valor": valor} for clave, valor in resultados_completos],
+        }
+        try:
+            await asyncio.to_thread(self._cola_informes.put, informe)
+        except Exception as exc:
+            raise protocolo.ErrorProtocolo(
+                "SERVICE_UNAVAILABLE", f"No se pudo encolar el informe: {exc}"
+            ) from exc
+        return "encolada"
 
     async def _esperar_grupo(self, job: Job, writer: asyncio.StreamWriter) -> dict[str, Any]:
         """Reduce el grupo de `job` emitiendo progreso monótono en paralelo.
@@ -298,6 +413,128 @@ class Coordinador:
             await writer.drain()
         except (ConnectionError, RuntimeError, OSError):
             pass
+
+    # -- Indexador, supervisión y señales (issues #20/#21/#22) --------------
+
+    def iniciar_servicios(self, server: asyncio.base_events.Server, db_path: str) -> None:
+        """Arranca el indexador (si no llegó ya armado), la supervisión y las
+        señales. Solo tiene sentido llamarla una vez el loop está corriendo:
+        `add_signal_handler` lo exige."""
+        self._server = server
+        self._evento_cierre = asyncio.Event()
+        if self._cola_informes is None:
+            self._iniciar_indexador(db_path)
+        self._tarea_supervision = asyncio.ensure_future(self._supervisar_indexador())
+
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, self._agendar_apagado)
+        loop.add_signal_handler(signal.SIGTERM, self._agendar_apagado)
+        loop.add_signal_handler(signal.SIGUSR1, self._agendar_snapshot)
+
+    async def esperar_cierre(self) -> None:
+        assert self._evento_cierre is not None, "iniciar_servicios() no fue llamado"
+        await self._evento_cierre.wait()
+
+    def _iniciar_indexador(self, db_path: str) -> None:
+        from loghunter import indexador
+
+        self._cola_informes = multiprocessing.Queue()
+        self._proceso_indexador = multiprocessing.Process(
+            target=indexador.ejecutar,
+            args=(self._cola_informes, db_path, self._metricas),
+        )
+        self._proceso_indexador.start()
+        logger.info("Indexador iniciado: pid=%s db=%s", self._proceso_indexador.pid, db_path)
+
+    async def _supervisar_indexador(self) -> None:
+        """Detecta la caída del hijo (CU-23): `is_alive()`/`exitcode` solo
+        consultan el estado ya conocido del proceso, no bloquean."""
+        try:
+            while True:
+                await asyncio.sleep(_INTERVALO_SUPERVISION)
+                if (
+                    self._proceso_indexador is not None
+                    and self._servicio_disponible
+                    and not self._proceso_indexador.is_alive()
+                ):
+                    self._servicio_disponible = False
+                    logger.critical(
+                        "El indexador terminó inesperadamente (exitcode=%s); "
+                        "dejo de admitir nuevos análisis",
+                        self._proceso_indexador.exitcode,
+                    )
+        except asyncio.CancelledError:
+            pass
+
+    def _agendar_snapshot(self) -> None:
+        """Handler de SIGUSR1: solo agenda la corrutina, sin I/O en el handler."""
+        asyncio.ensure_future(self._emitir_snapshot())
+
+    async def _emitir_snapshot(self) -> None:
+        async with self._lock:
+            jobs = [
+                (
+                    job.id,
+                    job.estado,
+                    job.completados,
+                    job.total,
+                    time.monotonic() - job.admitido_en if job.admitido_en is not None else 0.0,
+                )
+                for job in self._jobs.values()
+            ]
+        logger.info("snapshot (SIGUSR1): %d job(s) activo(s)", len(jobs))
+        for job_id, estado, completados, total, transcurrido in jobs:
+            logger.info(
+                "  job_id=%s estado=%s progreso=%d/%d transcurrido=%.1fs",
+                job_id, estado, completados, total, transcurrido,
+            )
+        logger.info("snapshot (SIGUSR1): contadores=%s", self._metricas.snapshot())
+
+    def _agendar_apagado(self) -> None:
+        """Handler de SIGINT/SIGTERM: agenda el apagado, nunca bloquea aquí."""
+        asyncio.ensure_future(self._apagar())
+
+    async def _apagar(self) -> None:
+        """Cierre ordenado (CU-19): deja de admitir, avisa y cancela jobs,
+        drena el indexador y espera al hijo fuera del loop antes de salir."""
+        if self._cerrando:
+            return
+        self._cerrando = True
+        logger.info("Apagado solicitado: dejo de admitir conexiones nuevas")
+        if self._server is not None:
+            self._server.close()
+
+        async with self._lock:
+            conexiones = list(self._conexiones.values())
+        for job, writer, tarea in conexiones:
+            await self._enviar(
+                writer,
+                protocolo.msg_error(job.id, "SERVER_SHUTDOWN", "El coordinador se está apagando."),
+            )
+            tarea.cancel()
+        if conexiones:
+            await asyncio.gather(*(tarea for _, _, tarea in conexiones), return_exceptions=True)
+
+        if self._cola_informes is not None:
+            await asyncio.to_thread(self._cola_informes.put, None)  # centinela tras lo ya encolado
+        if self._proceso_indexador is not None:
+            await asyncio.to_thread(self._proceso_indexador.join, _PLAZO_CIERRE)
+            if self._proceso_indexador.is_alive():
+                logger.error(
+                    "El indexador no terminó en %.0fs; aplico terminación forzada "
+                    "(no se garantiza que haya drenado todos los informes)",
+                    _PLAZO_CIERRE,
+                )
+                self._proceso_indexador.terminate()
+                await asyncio.to_thread(self._proceso_indexador.join, 5.0)
+        if self._cola_informes is not None:
+            self._cola_informes.close()
+        if self._tarea_supervision is not None:
+            self._tarea_supervision.cancel()
+            await asyncio.gather(self._tarea_supervision, return_exceptions=True)
+
+        if self._evento_cierre is not None:
+            self._evento_cierre.set()
 
 
 def _nuevo_job_id() -> str:
@@ -381,18 +618,22 @@ def construir_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--s3-endpoint", default=None, help="Endpoint de MinIO; si se omite, usa S3_ENDPOINT o su default"
     )
-    parser.add_argument("--db", default="informes.sqlite", help="Ruta de SQLite (indexador, aún sin integrar)")
+    parser.add_argument("--db", default="informes.sqlite", help="Ruta de SQLite del indexador (default: informes.sqlite)")
     return parser
 
 
-async def _servir(coordinador: Coordinador, ip: str, port: int) -> None:
+async def _servir(coordinador: Coordinador, ip: str, port: int, db_path: str) -> None:
     servidor = await asyncio.start_server(
         coordinador.atender_cliente, host=ip, port=port, limit=protocolo.LIMITE_PEDIDO
     )
     direcciones = ", ".join(str(sock.getsockname()) for sock in servidor.sockets or ())
     logger.info("Coordinador escuchando en %s", direcciones)
-    async with servidor:
-        await servidor.serve_forever()
+    coordinador.iniciar_servicios(servidor, db_path)
+    try:
+        await coordinador.esperar_cierre()
+    finally:
+        servidor.close()
+        await servidor.wait_closed()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -407,7 +648,7 @@ def main(argv: list[str] | None = None) -> None:
         max_jobs=args.max_jobs, job_timeout=args.job_timeout, chunk_mb_default=args.chunk_mb
     )
     try:
-        asyncio.run(_servir(coordinador, args.ip, args.port))
+        asyncio.run(_servir(coordinador, args.ip, args.port, args.db))
     except KeyboardInterrupt:
         logger.info("Coordinador detenido por el operador")
 
