@@ -46,6 +46,7 @@ guiado y comentado, con qué mostrar y por qué, está en
 | [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md) | Etapas técnicas, issues de GitHub y dependencias |
 | [Índice de ADR](doc/adr/INDEX.md) | 15 decisiones de arquitectura y desarrollo, alternativas y consecuencias |
 | [GUIA_DEMO.md](doc/GUIA_DEMO.md) | Recorrido ejecutable de punta a punta para mostrar el sistema en vivo |
+| [OPERACION.md](doc/OPERACION.md) | Referencia de consultas, defaults de CLI, escalado de workers y dónde ver cada resultado |
 | [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md) | Núcleo de análisis local (milestone 2) |
 | [VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md) | Distribución remota con Celery/Redis/MinIO (milestone 3) |
 | [VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md) | Recuperación y errores aislados con infraestructura real (milestone 6) |
