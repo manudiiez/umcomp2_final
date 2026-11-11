@@ -1,0 +1,29 @@
+name: Funcionalidad / mejora
+description: Algo nuevo o una mejora sobre algo existente
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema o necesidad
+      description: Qué se quiere lograr y para quién (asesor, administrador, visitante del sitio…).
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+  - type: textarea
+    id: aceptacion
+    attributes:
+      label: Criterios de aceptación
+      placeholder: |
+        - [ ] …
+        - [ ] …
+    validations:
+      required: true
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Repos o servicios afectados
+      description: ¿Requiere cambios en la API, el CRM o el front? ¿Rompe contratos de la API?

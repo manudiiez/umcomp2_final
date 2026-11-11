@@ -1,0 +1,105 @@
+# Despliegue de un host (issue #24, PROJECT_STATEMENT §14, ADR-0012). Redis,
+# MinIO, coordinador y worker: el indexador es un proceso hijo del
+# coordinador, no un servicio aparte. `docker compose up -d --scale worker=N`
+# replica el *worker* en este host; no simula varias máquinas (ver INSTALL.md
+# para el procedimiento con un worker externo real en otro host).
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  coordinador:
+    build: .
+    image: loghunter:local
+    command:
+      - python
+      - -m
+      - loghunter.coordinador
+      - -i
+      - "0.0.0.0"
+      - -p
+      - "8888"
+      - --chunk-mb
+      - "32"
+      - --max-jobs
+      - "3"
+      - --job-timeout
+      - "300"
+      - --db
+      - /data/informes.sqlite
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "8888:8888"
+    volumes:
+      - sqlite-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8888), timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build: .
+    image: loghunter:local
+    command:
+      - celery
+      - -A
+      - loghunter.tasks
+      - worker
+      - --loglevel=INFO
+      - -c
+      - "4"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A loghunter.tasks inspect ping --timeout 3 | grep -q OK"]
+      interval: 10s
+      timeout: 8s
+      retries: 5
+
+volumes:
+  minio-data:
+  sqlite-data:

@@ -6,6 +6,9 @@ venv/
 myenv/
 .venv/
 *.egg-info/
+.pytest_cache/
+build/
+dist/
 
 # Datos de prueba generados
 data/
@@ -20,3 +23,6 @@ data/
 # Entorno y SO
 .env
 .DS_Store
+
+# Claude Code (configuración personal)
+.claude/settings.local.json

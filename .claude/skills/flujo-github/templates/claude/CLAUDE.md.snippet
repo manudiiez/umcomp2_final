@@ -1,0 +1,22 @@
+<!-- flujo-github:inicio -->
+## Flujo de trabajo Git / GitHub
+
+Este repo usa la skill **`flujo-github`** (`.claude/skills/flujo-github/SKILL.md`). Cargala **siempre** antes de hacer un commit, crear o leer issues, crear ramas, abrir PRs, promover ramas o crear tags de versión.
+
+Lo esencial:
+
+- Ramas permanentes: `develop` (por defecto, integración) → `testing` (staging, imagen `:testing`) → `main` (versiones con tags `vX.Y.Z`).
+- Nunca push directo a `develop`, `testing` ni `main`. Nunca mergear PRs: los mergea el usuario.
+- Las ramas de trabajo salen de `develop`: `feat/N-slug`, `fix/N-slug`, `chore/…`. PR a `develop` con `Closes #N`.
+- Commits y títulos de PR en Conventional Commits, descripción en español e imperativo.
+- Al empezar: `git config core.hooksPath` debe ser `.githooks`.
+
+### Scopes de este repo
+
+<!-- COMPLETAR durante la instalación según la estructura del repo. Ej. API: properties, listings, portals, images, auth, workers, db -->
+
+### Comandos
+
+- Tests: `<!-- COMPLETAR -->`
+- Lint: `<!-- COMPLETAR -->`
+<!-- flujo-github:fin -->
