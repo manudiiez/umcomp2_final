@@ -53,7 +53,7 @@ instalación, importación y empaquetado son el resultado de esta etapa.
 
 ## Verificación y referencias
 
-Issue #2 y PROJECT_STATEMENT §§4 y 6. Verificar instalación editable, importación
+Issue #2; entorno y dependencias en INSTALL.md. Verificar instalación editable, importación
 sin servicios, construcción de wheel/sdist e instalación de la wheel fuera del repo.
 Referencias técnicas: [empaquetado de Python](https://packaging.python.org/en/latest/tutorials/packaging-projects/),
 [entorno y lockfile de uv](https://docs.astral.sh/uv/concepts/projects/layout/),

@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -45,5 +45,6 @@ puede ser grande si hay muchas claves distintas, aunque el cliente pida pocas.
 ## Verificación y referencias
 
 CU-16, CU-17, CU-19 y CU-23; AC-12, AC-13 y AC-20. Verificar atomicidad, entrega
-duplicada, top completo y caída del hijo. Esquema en PROJECT_STATEMENT §11;
-garantías de persistencia en PROJECT_STATEMENT §11.
+duplicada, top completo y caída del hijo. Esquema y garantías de persistencia
+en EXPLICACION_CODIGO.md, archivo 12 (`indexador.py`); cómo inspeccionar la
+base, en OPERACION.md §4.5.

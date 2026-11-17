@@ -1,14 +1,14 @@
 # Registro de decisiones de arquitectura y desarrollo
 
 Un ADR (*Architecture Decision Record*) registra una decisión, su contexto,
-alternativas y consecuencias. Estos documentos acompañan la especificación de
-[LogHunter](../PROJECT_STATEMENT.md) y sus [casos de uso](../USE_CASES.md).
+alternativas y consecuencias. Son las **decisiones de arquitectura y
+tecnología** del proyecto: acompañan la
+[explicación del código](../final/EXPLICACION_CODIGO.md) y la
+[guía de operación](../final/OPERACION.md).
 
-Fecha de consolidación: 2026-11-02. Estado de los ADR siguientes: **adoptado para
-la implementación**. El estado de desarrollo se indica en el README y en el plan;
-la adopción de una decisión no implica que toda su funcionalidad esté terminada.
-Cada decisión contiene su contexto y justificación técnica, y se relaciona con
-la especificación y los casos de uso vigentes.
+Fecha de consolidación: 2026-11-02. Estado de los ADR siguientes: **adoptado e
+implementado**. Cada decisión contiene su contexto y justificación técnica, y
+se relaciona con el código que la materializa.
 
 ## Índice
 
@@ -44,7 +44,8 @@ operativas, como ajustar un timeout dentro del modelo acordado, se documentan en
 configuración; una sustitución de Celery, almacenamiento o modelo de concurrencia
 requiere revisar el ADR y la especificación.
 
-Los ADR explican el porqué; PROJECT_STATEMENT define el contrato observable y
-USE_CASES sus escenarios. Si se detecta una contradicción, corregir los documentos
-afectados antes de implementar conductas incompatibles, sin ampliar el alcance
-silenciosamente.
+Los ADR explican **el porqué**;
+[EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md) explica **el cómo** y
+[OPERACION.md](../final/OPERACION.md), **cómo ejecutarlo y comprobarlo**. Si se
+detecta una contradicción, corregir los documentos afectados antes de
+implementar conductas incompatibles, sin ampliar el alcance silenciosamente.

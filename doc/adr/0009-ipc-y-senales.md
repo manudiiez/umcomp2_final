@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -14,7 +14,7 @@ También hace falta inspección y cierre sin construir una API administrativa.
 
 Usar `multiprocessing.Queue` para informes y centinela final, y `Value` con `Lock`
 para métricas escalares. Proteger lecturas y escrituras, incluido `+=`, y asignar
-un responsable por métrica según PROJECT_STATEMENT §11.
+un responsable por métrica; ver EXPLICACION_CODIGO.md, archivo 11 (`ipc.py`).
 
 Usar `SIGUSR1` para agendar snapshot y `SIGINT`/`SIGTERM` para iniciar el cierre.
 El handler no realiza I/O bloqueante ni espera locks largos. Al cerrar, detener

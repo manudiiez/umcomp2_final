@@ -6,7 +6,7 @@ description: Gestionar el trabajo Git y GitHub de LogHunter mediante Conventiona
 # Flujo GitHub de LogHunter
 
 Repositorio: `manudiiez/umcomp2_final`. Aplicar a cambios de código, documentación,
-pruebas y configuración. Requisitos: `doc/PROJECT_STATEMENT.md` y `doc/USE_CASES.md`.
+pruebas y configuración. Requisitos: `CLAUDE.md` y `doc/adr/INDEX.md`.
 
 ## Reglas obligatorias
 
@@ -49,7 +49,7 @@ Un pedido de planificar/crear issues no autoriza pushes, PRs ni ramas remotas.
 | PR develop → main | `chore(release): promover develop a main` |
 
 Los números anteriores son ilustrativos. El número de milestone no es un issue.
-El plan real de etapas e issues está en `doc/DEVELOPMENT_PLAN.md`.
+El estado del proyecto está en `README.md`.
 Scopes recomendados: `cliente`, `coordinador`, `lector`, `parser`, `consultas`,
 `workers`, `indexador`, `generador`, `protocolo`, `config`, `db`, `docker`, `github`,
 `docs`. Omitir scope para cambios transversales. Detalle en

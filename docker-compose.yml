@@ -1,4 +1,4 @@
-# Despliegue de un host (issue #24, PROJECT_STATEMENT §14, ADR-0012). Redis,
+# Despliegue de un host (ADR-0012). Redis,
 # MinIO, coordinador y worker: el indexador es un proceso hijo del
 # coordinador, no un servicio aparte. `docker compose up -d --scale worker=N`
 # replica el *worker* en este host; no simula varias máquinas (ver INSTALL.md

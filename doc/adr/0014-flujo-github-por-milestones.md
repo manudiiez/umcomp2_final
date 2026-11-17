@@ -45,4 +45,4 @@ según la rama predeterminada real, sin asumir que ocurre al integrar un milesto
 
 Comprobar issue/milestone, base de cada rama, destino de cada PR y formato de
 commits. Confirmar integración y pruebas antes de promover a main.
-Referencias: PROJECT_STATEMENT §16, ADR-0013 y la skill del proyecto.
+Referencias: ADR-0013 y la skill del proyecto.

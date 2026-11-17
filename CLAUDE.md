@@ -10,15 +10,14 @@ de sockets concurrentes, IPC, asincronismo de I/O y colas de tareas distribuidas
 por lo que **los mecanismos elegidos son el objeto de la evaluación**, no solo el
 resultado funcional.
 
-**Estado actual: los seis milestones de `doc/DEVELOPMENT_PLAN.md` están
-implementados y verificados con infraestructura real** (núcleo local,
-distribución con Celery/Redis/MinIO, cliente-servidor `asyncio`,
-persistencia/IPC/señales, Docker Compose, benchmark); pendiente la promoción
-de `develop` a `main` y la revisión final del issue #28. El entorno se
+**Estado actual: el sistema completo está implementado y verificado con
+infraestructura real** (núcleo local, distribución con Celery/Redis/MinIO,
+cliente-servidor `asyncio`, persistencia/IPC/señales, Docker Compose,
+benchmark); pendiente la promoción de `develop` a `main`. El entorno se
 prepara con `uv sync --locked --python 3.12` y las pruebas con
 `uv run --locked python -m pytest`. Consultar `INSTALL.md` para el
-despliegue completo y `doc/VERIFICACION_*.md` para la evidencia real de cada
-etapa. La especificación, los casos de uso y los ADR están en `doc/`.
+despliegue y `doc/final/OPERACION.md` para ejecutar y probar cada comando,
+con salidas reales registradas.
 
 La documentación y los mensajes de commit están en **castellano**.
 
@@ -28,19 +27,19 @@ Antes de escribir código, leer:
 
 | Archivo | Qué define |
 |---|---|
-| `doc/PROJECT_STATEMENT.md` | **Contrato vigente de implementación**: alcance, arquitectura, protocolos, datos, CLI, fallos y aceptación |
-| `doc/USE_CASES.md` | Flujos, alternativas, errores y resultados verificables de cada funcionalidad |
-| `doc/DEVELOPMENT_PLAN.md` | Etapas técnicas, issues reales, dependencias y seguimiento de avances |
-| `doc/adr/INDEX.md` | Índice de decisiones, razones, alternativas y consecuencias |
+| `doc/final/EXPLICACION_CODIGO.md` | **Referencia de implementación**: qué hace cada archivo, los conceptos y el particionado en profundidad |
+| `doc/final/OPERACION.md` | Cómo levantar, ejecutar y probar cada comando, con ejemplos y salidas reales |
+| `doc/adr/INDEX.md` | Índice de decisiones de arquitectura y tecnología, con alternativas y consecuencias |
+| `INFO.md` | Decisiones de diseño y su justificación, enlazando los ADR |
 | `../UM_C2/FINAL.md` | Requisitos de la cátedra (fuera de este repo) |
 
-`doc/PROJECT_STATEMENT.md` define el **contrato** de desarrollo. Aplicar sus
-contratos exactos junto con los casos de uso y sus ADR.
-No agregar funcionalidad excluida sin que el usuario lo pida explícitamente.
+Los **invariantes de diseño** de este archivo y los ADR son el contrato
+vigente. No agregar funcionalidad que no esté implementada sin que el
+usuario lo pida explícitamente.
 
 La arquitectura permite ejecutar los workers en máquinas independientes del
-almacenamiento del log. El contrato de lectura por rangos y sus fundamentos se
-encuentran en `doc/PROJECT_STATEMENT.md` §8 y ADR-0004/ADR-0005.
+almacenamiento del log. El contrato de lectura por rangos y sus fundamentos
+están en `doc/final/EXPLICACION_CODIGO.md` Parte 3 y ADR-0004/ADR-0005.
 
 ## Arquitectura
 
@@ -120,10 +119,10 @@ Violar cualquiera de estos rompe la justificación del proyecto ante el tribunal
    `pickle` ejecuta código al deserializar y el coordinador acepta conexiones de
    cualquiera.
 
-## Comandos previstos
+## Comandos
 
-Interfaz consolidada en `doc/PROJECT_STATEMENT.md` §12. **Aún no implementada**; al
-escribir el código respetar sus nombres de flags, defaults y precedencia.
+Interfaz implementada; la referencia de flags, defaults, precedencia y
+ejemplos con salidas reales está en `doc/final/OPERACION.md` §4.
 
 ```bash
 # Infraestructura
@@ -173,8 +172,7 @@ completos desde el issue #27 (milestone 6) y se mantienen junto al código:
 
 - `INSTALL.md` — entorno, servicios, despliegue con Compose y workers remotos.
 - `INFO.md` — decisiones de diseño y su justificación, enlazando los ADR.
-- `TODO.md` — mejoras y features futuras, partiendo de las exclusiones de
-  `doc/PROJECT_STATEMENT.md` §3.2.
+- `TODO.md` — mejoras y features futuras, partiendo del alcance excluido.
 - `README.md` — portada, estado, documentación y uso básico.
 
 Si un cambio posterior afecta alcance, decisiones o instalación, actualizar

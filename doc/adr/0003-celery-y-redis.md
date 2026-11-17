@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -22,7 +22,8 @@ Habilitar `task_acks_late` y `task_reject_on_worker_lost`; hacer reintentos fini
 con backoff para lecturas transitorias. Los errores permanentes fallan el job.
 Usar task IDs para agregar una vez cada parcial lógico, aunque haya reejecuciones.
 Configurar `time_limit`, expiración, visibility timeout y retención según
-PROJECT_STATEMENT §9.3; comprobar su interacción con pruebas de caída.
+EXPLICACION_CODIGO.md, archivo 9 (`tasks.py`); comprobar su interacción con
+pruebas de caída (`tests/test_fallos.py`).
 
 ## Alternativas
 

@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -13,10 +13,10 @@ Las URLs y credenciales de servicios deben ser coherentes entre procesos.
 ## Decisión
 
 Usar `argparse` en cliente, coordinador y generador, con los nombres de flags
-definidos en PROJECT_STATEMENT §12. Usar la CLI propia de Celery para los workers. Todos los
+definidos en OPERACION.md §4. Usar la CLI propia de Celery para los workers. Todos los
 ejecutables propios ofrecen ayuda y validación previa de argumentos.
 
-Adoptar los defaults/rangos de PROJECT_STATEMENT §12. Respetar precedencia flags
+Adoptar los defaults/rangos documentados en OPERACION.md §4. Respetar precedencia flags
 explícitos → entorno → defaults. Configurar broker y backend por separado;
 compartir endpoint S3 y credenciales por entorno. No incluir secretos en mensajes,
 archivos versionados ni logs. La URI S3 identifica bucket/key, no las credenciales.
@@ -42,4 +42,5 @@ subida. El modo raw no agrega una quinta consulta ni un protocolo diferente.
 ## Verificación y referencias
 
 CU-01, CU-06, CU-10 y CU-15; AC-14. Verificar ayuda, precedencia, validaciones,
-IPv4/IPv6, stdout JSON y códigos de salida. Contrato de CLI en PROJECT_STATEMENT §12.
+IPv4/IPv6, stdout JSON y códigos de salida. Referencia de CLI, con ejemplos y
+salidas reales, en OPERACION.md §4.

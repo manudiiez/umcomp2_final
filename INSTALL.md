@@ -2,26 +2,21 @@
 
 ## Estado actual
 
-Los seis milestones de `doc/DEVELOPMENT_PLAN.md` están implementados y
-verificados con infraestructura real:
+El sistema completo está implementado y verificado con infraestructura real:
 
-| Milestone | Qué agrega | Evidencia |
+| Componente | Qué agrega | Pruebas |
 |---|---|---|
-| 2 — núcleo local | `parser`, `consultas`, `generar`, `lector` (`local://`), `workers` (map-reduce en memoria) | [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md) |
-| 3 — distribución remota | `tasks` (Celery/Redis), backend `s3://`, subida a MinIO, `analisis` (correlación y reduce) | [VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md) |
-| 4 — cliente-servidor | `protocolo` (TCP/JSON por LF), `coordinador` (`asyncio`), `cliente` (CLI) | `tests/test_protocolo.py`, `tests/test_coordinador.py`, `tests/test_cliente.py` |
-| 5 — persistencia e IPC | `indexador` (proceso hijo, SQLite), `ipc.Metricas`, señales y apagado ordenado | `tests/test_indexador.py`, `tests/test_ipc.py`, `tests/test_operacion.py` |
-| 6 — integración y entrega | Fallos reales, Docker Compose, benchmark, documentación final | [VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md), [VERIFICACION_INTEGRACION.md](doc/VERIFICACION_INTEGRACION.md), [VERIFICACION_BENCHMARK.md](doc/VERIFICACION_BENCHMARK.md) |
+| Núcleo local | `parser`, `consultas`, `generar`, `lector` (`local://`), `workers` (map-reduce en memoria) | `tests/test_parser.py`, `tests/test_consultas.py`, `tests/test_workers.py` |
+| Distribución remota | `tasks` (Celery/Redis), backend `s3://`, subida a MinIO, `analisis` (correlación y reduce) | `tests/test_integracion_distribucion.py` |
+| Cliente-servidor | `protocolo` (TCP/JSON por LF), `coordinador` (`asyncio`), `cliente` (CLI) | `tests/test_protocolo.py`, `tests/test_coordinador.py`, `tests/test_cliente.py` |
+| Persistencia e IPC | `indexador` (proceso hijo, SQLite), `ipc.Metricas`, señales y apagado ordenado | `tests/test_indexador.py`, `tests/test_ipc.py`, `tests/test_operacion.py` |
+| Integración y fallos | Fallos reales, Docker Compose, benchmark | `tests/test_fallos.py`, `scripts/benchmark_procesos.py` |
 
-`cliente.py`, `coordinador.py` e `indexador.py` ya no son solo ubicación
-reservada: forman la aplicación cliente-servidor real (ver
-[GUIA_DEMO.md](doc/GUIA_DEMO.md) para un recorrido ejecutable de punta a
-punta).
-
-El contrato de implementación está en
-[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md); el orden en que se construyó,
-en [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md); las decisiones y su
-justificación, en [INFO.md](INFO.md); lo explícitamente fuera de alcance, en
+Para levantarlo, ejecutar cada comando y probarlo con salidas reales, ver
+[doc/final/OPERACION.md](doc/final/OPERACION.md). La explicación del código
+está en [doc/final/EXPLICACION_CODIGO.md](doc/final/EXPLICACION_CODIGO.md);
+las decisiones y su justificación, en [INFO.md](INFO.md) y
+[doc/adr/INDEX.md](doc/adr/INDEX.md); lo que queda fuera de alcance, en
 [TODO.md](TODO.md).
 
 ## Requisitos
@@ -40,8 +35,8 @@ Utilizar una versión de mantenimiento actualizada de CPython 3.12.
 ```bash
 git clone https://github.com/manudiiez/umcomp2_final.git
 cd umcomp2_final
-# Mientras la entrega no esté promovida a main (ver doc/DEVELOPMENT_PLAN.md),
-# develop tiene la implementación completa de los seis milestones.
+# Mientras la entrega no esté promovida a main,
+# develop tiene la implementación completa.
 git switch develop
 uv sync --locked --python 3.12
 ```
@@ -178,8 +173,8 @@ print(cliente.list_buckets()['Buckets'])
 
 ### Variables de entorno compartidas
 
-Ver PROJECT_STATEMENT §12.4. Flags explícitos de cada comando prevalecen sobre
-estas variables, y estas sobre los defaults del código:
+Flags explícitos de cada comando prevalecen sobre estas variables, y estas
+sobre los defaults del código (ADR-0010):
 
 | Variable | Default usado por LogHunter | Uso |
 |---|---|---|
@@ -200,11 +195,11 @@ docker rm -f loghunter-redis loghunter-minio
 
 Sin volumen montado, los datos de MinIO se pierden al eliminar el contenedor;
 eso es aceptable para desarrollo. El despliegue de Compose de la sección
-siguiente sí define volúmenes persistentes (PROJECT_STATEMENT §14).
+siguiente sí define volúmenes persistentes (ADR-0012).
 
 ## Despliegue con Docker Compose
 
-`docker-compose.yml` (issue #24, PROJECT_STATEMENT §14, ADR-0012) define
+`docker-compose.yml` (ADR-0012) define
 `redis`, `minio`, `coordinador` y `worker` a partir de una única imagen
 (`Dockerfile`, Python 3.12 + el proyecto instalado en modo editable). El
 **indexador no es un servicio**: es el proceso hijo que el propio
@@ -212,7 +207,7 @@ coordinador lanza con `multiprocessing` dentro de su contenedor, igual que en
 desarrollo local. Volúmenes propios para los datos de MinIO (`minio-data`) y
 el SQLite del coordinador (`sqlite-data`); Redis no tiene volumen a
 propósito, porque el proyecto no promete que la cola sobreviva a su pérdida
-(ADR-0012, PROJECT_STATEMENT §14).
+(ADR-0012).
 
 ```bash
 docker compose build
@@ -222,7 +217,8 @@ docker compose ps   # las cuatro réplicas de worker y los tres servicios "healt
 
 `--scale worker=4` replica el *contenedor* worker en **este host**; con
 `-c 4` en cada réplica (fijado en el `command` del servicio) son 16 procesos
-Celery totales, no 4 — PROJECT_STATEMENT §14 pide distinguir ambos números.
+Celery totales, no 4; conviene distinguir ambos números (ver
+OPERACION.md §4.4).
 No simula varias máquinas: para eso hace falta un worker en otro host (ver
 más abajo).
 
@@ -296,7 +292,7 @@ docker run -d --name loghunter-worker-externo \
   loghunter:local celery -A loghunter.tasks worker --loglevel=INFO -c 2 -n externo@%h
 ```
 
-Mismo mecanismo que el worker en contenedor separado documentado en
-[VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md), ahora
-alcanzando los puertos publicados por Compose en vez de los contenedores
-manuales de desarrollo.
+Mismo mecanismo que el worker en contenedor separado, ahora alcanzando los
+puertos publicados por Compose en vez de los contenedores manuales de
+desarrollo. El ejemplo verificado de un worker extra sumándose al reparto
+está en [OPERACION.md §4.4](doc/final/OPERACION.md).

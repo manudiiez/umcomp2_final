@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -47,6 +47,7 @@ README, INSTALL, INFO y TODO forman parte de la entrega, junto a la evidencia.
 
 ## Verificación y referencias
 
-CU-11 y CU-21; AC-16 y AC-18, más matriz completa de PROJECT_STATEMENT §15.
-Requisitos académicos y entregables reproducidos en PROJECT_STATEMENT §16;
+Estrategia y mapa de las pruebas en EXPLICACION_CODIGO.md Parte 5; los
+escenarios de pytest y el benchmark, en OPERACION.md §§4.7–4.8 y §6.
+Requisitos académicos y entregables:
 [consigna de la cátedra](../../../UM_C2/FINAL.md).

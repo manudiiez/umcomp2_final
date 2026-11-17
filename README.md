@@ -1,56 +1,112 @@
 # LogHunter
 
-Analizador distribuido de logs mediante map-reduce.
+Analizador **distribuido** de logs web mediante map-reduce.
 
 Trabajo final de **Computación II** — Universidad de Mendoza, Sede San Rafael.
 Facultad de Ingeniería, Ingeniería en Informática.
 
-## Estado
+## Propósito
 
-Los seis milestones de [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md) están
-implementados y verificados con infraestructura real, no solo con dobles de
-prueba: núcleo de análisis local (parser, consultas, generador, lector
-`mmap` por rangos), distribución remota con Celery/Redis y lectura/escritura
-en MinIO (`s3://`), un coordinador `asyncio` con protocolo TCP/JSON que
-atiende múltiples clientes sin bloquear su *event loop*, persistencia en
-SQLite a través de un proceso indexador, IPC y señales para operación, y
-despliegue completo con Docker Compose. Evidencia real de cada etapa en
-los `doc/VERIFICACION_*.md` listados abajo. Pendiente: la promoción de
-`develop` a `main` y la revisión final (issue #28).
+Un servidor web escribe en su `access.log` una línea por cada petición que
+atiende: quién la hizo, qué pidió, qué se le respondió y cuántos bytes se le
+enviaron. Con tráfico real ese archivo llega a **gigabytes**, y las preguntas
+que importan —¿quién consume más?, ¿qué endpoints se usan?, ¿está sano el
+servicio?, ¿cuándo son los picos?— no se pueden responder leyéndolo de
+corrido en una sola máquina.
+
+LogHunter las responde **partiendo el archivo en tramos de bytes y
+procesándolos en paralelo** en varios procesos que pueden vivir en máquinas
+distintas a la del log. Un cliente pide un análisis por TCP, un coordinador
+calcula los cortes y reparte el trabajo por una cola, los workers cuentan
+cada uno su pedazo, y el coordinador suma los parciales en un informe único
+que además queda persistido.
+
+El objeto de la evaluación son **los mecanismos**, no el resultado: el
+proyecto hace convivir a propósito dos modelos de concurrencia distintos,
+porque resuelven problemas distintos.
+
+| | Dónde | Por qué |
+|---|---|---|
+| **Concurrencia** (`asyncio`) | `coordinador.py` | Es **I/O-bound**: se pasa el tiempo esperando sockets y resultados. Un solo hilo atiende N clientes sin el costo de procesos ni *data races* |
+| **Paralelismo** (procesos) | workers Celery | Es **CPU-bound**: aplicar expresiones regulares a millones de líneas es cálculo puro, y el GIL impide paralelizarlo con hilos |
+
+Consultas disponibles: `top-ips`, `status`, `urls`, `traffic`.
+
+## Arquitectura
+
+```mermaid
+flowchart TB
+    subgraph CLIS["1. CLIENTES - varios al mismo tiempo"]
+        direction LR
+        C1["cliente 1"]
+        C2["cliente 2"]
+    end
+
+    K["2. COORDINADOR · 1 proceso, 1 hilo<br/>=== ACA ESTA LA CONCURRENCIA (asyncio) ===<br/>atiende a los dos clientes a la vez,<br/>porque se pasa el tiempo esperando<br/><br/>parte el archivo y reparte · NO cuenta"]
+
+    R[("3. REDIS · la cola de tareas<br/>guarda las tareas pendientes<br/>y los conteos parciales<br/>TEMPORAL · en memoria")]
+
+    subgraph WRK["4. WORKERS === ACA ESTA EL PARALELISMO === procesos separados, 1 o más máquinas"]
+        direction LR
+        W1["worker 1<br/>cuenta su pedazo"]
+        W2["worker 2<br/>cuenta su pedazo"]
+        WN["worker N<br/>cuenta su pedazo"]
+    end
+
+    LOG[("ALMACENAMIENTO DEL LOG · 2 GB<br/>MinIO (API S3) en su propia máquina<br/>o archivo local en modo una-sola-máquina")]
+    DB[("6. SQLITE · la base<br/>histórico de los análisis<br/>que ya terminaron<br/>PERMANENTE · en disco")]
+
+    CLIS -->|"pido: top-ips de access.log"| K
+    K -.->|"solo pregunta cuánto mide,<br/>NO lee el contenido"| LOG
+    K -->|"deja 67 tareas:<br/>archivo + desde qué byte + hasta cuál"| R
+    R -->|"cada worker libre agarra una"| WRK
+    WRK -->|"pide SOLO su pedazo:<br/>GET Range bytes=0-33554431"| LOG
+    WRK -->|"devuelve su conteo parcial"| R
+    R -->|"5. el coordinador junta los 67 parciales"| K
+    K -->|"informe final"| CLIS
+    K -->|"guarda el informe terminado"| DB
+```
+
+Las tres propiedades que sostienen el diseño:
+
+1. **Por la cola viajan coordenadas, no datos.** Se encola
+   `(uri, inicio, fin)`, nunca los bytes del tramo: mandar los datos
+   significaría empujar GB por Redis. Cada worker resuelve el acceso por su
+   cuenta, y por eso **nada lo ata a la máquina del archivo**.
+2. **El coordinador no lee el contenido del log.** Solo pide su tamaño y
+   divide por aritmética. La alineación a fin de línea la hace cada worker
+   sobre su propio tramo, de modo que los registros quedan **disjuntos y
+   cubren el archivo completo**.
+3. **El event loop nunca se bloquea.** Toda llamada bloqueante sale del loop
+   —a un hilo auxiliar o al proceso indexador, único escritor de SQLite—
+   porque un `INSERT` lento dentro del loop congelaría la atención de todos
+   los clientes.
 
 ## Uso rápido
 
-Con Redis, MinIO, un worker Celery y el coordinador arriba (ver
-[INSTALL.md](INSTALL.md) para el detalle completo o
-[docker-compose.yml](docker-compose.yml) para levantar todo de una vez):
+Con todo levantado por Compose (ver [INSTALL.md](INSTALL.md)):
 
 ```bash
-uv run --locked python -m loghunter.generar -o s3://logs/demo.log --size-mb 10 --seed 1
-uv run --locked python -m loghunter.cliente -i 127.0.0.1 -p 8888 \
-  --file s3://logs/demo.log --query top-ips --top 10
+docker compose up -d --scale worker=2
+
+uv run --locked python -m loghunter.generar -o s3://logs-demo/access.log --size-mb 20 --seed 7
+uv run --locked python -m loghunter.cliente -f s3://logs-demo/access.log -q top-ips --top 10
 ```
 
-Consultas disponibles: `top-ips`, `status`, `urls`, `traffic`. Un recorrido
-guiado y comentado, con qué mostrar y por qué, está en
-[GUIA_DEMO.md](doc/GUIA_DEMO.md).
+El paso a paso para levantarlo, ejecutar cada comando y probarlo —con
+ejemplos y salidas reales— está en
+[doc/final/OPERACION.md](doc/final/OPERACION.md).
 
 ## Documentación
 
 | Archivo | Contenido |
 |---|---|
+| [doc/final/OPERACION.md](doc/final/OPERACION.md) | Cómo levantarlo y probarlo: qué hace cada comando, sus parámetros, un ejemplo ejecutable de cada operación con su salida real, y una secuencia de pruebas para la defensa |
+| [doc/final/EXPLICACION_CODIGO.md](doc/final/EXPLICACION_CODIGO.md) | Explicación del código archivo por archivo, los conceptos de concurrencia y paralelismo, el particionado en profundidad y el flujo de punta a punta |
+| [Índice de ADR](doc/adr/INDEX.md) | Las 15 decisiones de arquitectura y tecnología, con alternativas consideradas y consecuencias aceptadas |
+| [INFO.md](INFO.md) | Resumen de las decisiones de diseño y su justificación, enlazando los ADR |
 | [INSTALL.md](INSTALL.md) | Entorno, dependencias, servicios externos, despliegue con Compose y workers remotos |
-| [INFO.md](INFO.md) | Decisiones de diseño y su justificación, enlazando los ADR |
-| [TODO.md](TODO.md) | Mejoras futuras, a partir del alcance excluido y de límites reconocidos en la verificación |
-| [PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md) | Objetivo, alcance, tecnologías, arquitectura, contratos, ejemplos y criterios de aceptación |
-| [USE_CASES.md](doc/USE_CASES.md) | 24 casos de uso con flujos, alternativas y resultados esperados |
-| [DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md) | Etapas técnicas, issues de GitHub y dependencias |
-| [Índice de ADR](doc/adr/INDEX.md) | 15 decisiones de arquitectura y desarrollo, alternativas y consecuencias |
-| [GUIA_DEMO.md](doc/GUIA_DEMO.md) | Recorrido ejecutable de punta a punta para mostrar el sistema en vivo |
-| [VERIFICACION_NUCLEO.md](doc/VERIFICACION_NUCLEO.md) | Núcleo de análisis local (milestone 2) |
-| [VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md) | Distribución remota con Celery/Redis/MinIO (milestone 3) |
-| [VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md) | Recuperación y errores aislados con infraestructura real (milestone 6) |
-| [VERIFICACION_INTEGRACION.md](doc/VERIFICACION_INTEGRACION.md) | Matriz de evidencia de los 20 criterios de aceptación (milestone 6) |
-| [VERIFICACION_BENCHMARK.md](doc/VERIFICACION_BENCHMARK.md) | Medición real con 1, 2 y 4 procesos (milestone 6) |
+| [TODO.md](TODO.md) | Mejoras futuras, a partir del alcance excluido y de los límites reconocidos |
 | [Skill de GitHub](.claude/skills/flujo-github/SKILL.md) | Conventional Commits y PRs de issue a milestone, develop y main |
 
 ## Desarrollo local
@@ -65,3 +121,9 @@ uv run --locked python -m pytest
 `uv` crea `.venv/` dentro del checkout y utiliza `uv.lock` para reproducir las
 dependencias. La guía completa, incluido el despliegue con Docker Compose,
 está en [INSTALL.md](INSTALL.md).
+
+> **Nota sobre `pytest`:** bajá Compose antes de correr la suite. Los tests de
+> integración usan contenedores con nombres fijos y los paran a propósito para
+> probar fallos; con Compose arriba, sus workers compiten por la misma cola.
+> Los tres escenarios válidos están en
+> [OPERACION.md §6](doc/final/OPERACION.md).

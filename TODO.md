@@ -1,14 +1,12 @@
 # TODO — mejoras futuras
 
-LogHunter cumple el alcance acordado con la cátedra
-([PROJECT_STATEMENT.md §3](doc/PROJECT_STATEMENT.md)); esta lista parte de lo
-que ese mismo documento excluye explícitamente (§3.2) y de límites
-reconocidos en las verificaciones reales (`doc/VERIFICACION_*.md`). No es
-una promesa de implementación: es dónde seguiría el proyecto si continuara
-más allá de la entrega. No implementar nada de esta lista sin que el
-alcance se actualice primero en `PROJECT_STATEMENT.md` y su ADR.
+LogHunter cumple el alcance acordado con la cátedra; esta lista parte de lo
+que quedó explícitamente excluido y de límites reconocidos en las
+verificaciones reales. No es una promesa de implementación: es dónde
+seguiría el proyecto si continuara más allá de la entrega. No implementar
+nada de esta lista sin registrar antes la decisión en un ADR.
 
-## A partir de las exclusiones de PROJECT_STATEMENT §3.2
+## A partir del alcance excluido
 
 - **Autenticación/autorización de clientes.** Hoy el coordinador acepta
   cualquier conexión TCP en su red; el entorno previsto es de
@@ -47,7 +45,7 @@ alcance se actualice primero en `PROJECT_STATEMENT.md` y su ADR.
 ## A partir de límites reconocidos en la verificación real
 
 - **Escalar el benchmark más allá de 4 procesos.**
-  `doc/VERIFICACION_BENCHMARK.md` mide 1/2/4 en un host de 11 núcleos y
+  El benchmark mide 1/2/4 procesos en un host de 11 núcleos y
   observa que la eficiencia marginal *mejoró* de 2→4 (amortización del
   costo fijo de round-trip por tarea); no se sabe si eso se sostiene a 8 o
   16 procesos, ni en un host con menos núcleos. Repetir el ensayo con más
@@ -55,23 +53,21 @@ alcance se actualice primero en `PROJECT_STATEMENT.md` y su ADR.
   contenedores en un solo host) daría una medición de distribución
   completa, separada de la de concurrencia de un solo nodo.
 - **Agregación en disco para cardinalidad muy alta de claves.**
-  PROJECT_STATEMENT §14 ya documenta que los contadores completos ocupan
+  Está documentado que los contadores completos ocupan
   memoria proporcional a las claves distintas y que esta versión no
   implementa un motor de agregación en disco. Si el caso de uso previera
   URLs o IPs con cardinalidad no acotada, un `Counter` en memoria por job
   dejaría de ser viable.
-- **Pruebas de fallos combinados.** `doc/VERIFICACION_INTEGRACION.md` señala
-  que las señales reales, Redis/MinIO reales y la caída del indexador se
-  verificaron reales pero por separado, no las tres condiciones
-  combinadas en una sola corrida (p. ej. apagar el coordinador por señal
-  mientras el indexador está caído y MinIO no responde). Cubrir esa
-  combinación agregaría certeza marginal sobre interacciones que
-  PROJECT_STATEMENT no describe como un escenario propio, al costo de una
+- **Pruebas de fallos combinados.** Las señales reales, Redis/MinIO reales y
+  la caída del indexador se verificaron reales pero **por separado**, no las
+  tres condiciones combinadas en una sola corrida (p. ej. apagar el
+  coordinador por señal mientras el indexador está caído y MinIO no
+  responde). Cubrir esa combinación agregaría certeza marginal sobre
+  interacciones que no son un escenario propio del alcance, al costo de una
   prueba frágil y lenta — se dejó fuera de la entrega por esa razón, no por
   falta de tiempo solamente.
-- **Checkout limpio real en una máquina sin este repositorio.**
-  `doc/VERIFICACION_INTEGRACION.md` documenta que el build de Compose sí se
-  verificó desde un contexto de build limpio, pero el flujo completo
+- **Checkout limpio real en una máquina sin este repositorio.** El build de
+  Compose se verificó desde un contexto de build limpio, pero el flujo completo
   `git clone` → `uv sync` → pruebas no se repitió en una máquina nueva
   separada de este entorno de desarrollo. `tests/test_imports.py` cubre la
   parte automatizable (el paquete instalado se importa desde otro
@@ -92,5 +88,4 @@ alcance se actualice primero en `PROJECT_STATEMENT.md` y su ADR.
 - **Métrica de latencia por tarea, no solo contadores agregados.**
   `ipc.Metricas` cuenta jobs activos e informes emitidos/persistidos; no
   hay percentiles de tiempo por tarea Celery, que ayudarían a diagnosticar
-  el cuello de botella de round-trip descrito en
-  `doc/VERIFICACION_BENCHMARK.md` sin tener que correr el benchmark.
+  el cuello de botella de round-trip sin tener que correr el benchmark.

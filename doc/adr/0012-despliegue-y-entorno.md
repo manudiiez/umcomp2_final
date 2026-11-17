@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -46,4 +46,4 @@ fijadas debe verificarse al implementar; registrar cualquier cambio de tecnolog�
 
 CU-07 y CU-20; AC-08 y AC-17. Instalar desde checkout limpio, preservar datos al
 recrear servicios y completar un job con un worker en otro host. Detalles del
-contrato de despliegue en PROJECT_STATEMENT §§4, 12 y 14.
+despliegue en INSTALL.md y OPERACION.md §§1–3.
