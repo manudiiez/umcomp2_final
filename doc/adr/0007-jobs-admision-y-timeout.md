@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -18,7 +18,8 @@ job. Mantener sus task IDs y socket en el registro activo. Usar semáforo con
 
 Iniciar deadline monotónico al adquirir cupo; default 300 s. Publicar progreso
 por tramos exitosos y comprobar fallo del grupo antes de reducir. La lista de
-estados y el alcance temporal están definidos en PROJECT_STATEMENT §9.
+estados y el alcance temporal están descritos en EXPLICACION_CODIGO.md,
+archivo 4 (`coordinador.py`).
 
 En timeout, fallo terminal, desconexión detectada o apagado, revocar pendientes
 de ese job, ignorar tardíos y limpiar en `finally`. No matar globalmente procesos

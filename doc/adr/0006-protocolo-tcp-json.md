@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -15,7 +15,7 @@ mensajes. No existe equivalencia garantizada entre una escritura y una lectura.
 Usar TCP, JSON UTF-8 y LF como delimitador. Una conexión contiene un pedido y
 respuestas `accepted`, `started`, `progress`, seguidas por `result` o `error`.
 Versionar el contrato con `version: 1` y correlacionar respuestas con `job_id`.
-Los esquemas y códigos están en PROJECT_STATEMENT §10.
+Los esquemas y códigos están en EXPLICACION_CODIGO.md, archivo 3 (`protocolo.py`).
 
 Validar en cliente y servidor; limitar pedidos a 64 KiB y su lectura inicial a
 30 s. Los informes pueden ser mayores. Ante campos/versiones desconocidos,
@@ -42,4 +42,4 @@ jobs; tampoco incorpora autenticación de clientes.
 
 CU-01, CU-10 y CU-15; AC-14 y AC-15. Incluir fragmentación en varios envíos,
 mensajes recibidos juntos y entradas inválidas, sin ejecutar datos del cliente.
-Contrato completo: PROJECT_STATEMENT §10.
+Contrato completo: EXPLICACION_CODIGO.md, archivo 3 (`protocolo.py`).

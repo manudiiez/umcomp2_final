@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -42,5 +42,6 @@ claves afecta memoria y tráfico de resultados; no se promete memoria constante.
 ## Verificación y referencias
 
 Comparar las cuatro consultas con una referencia secuencial y verificar igualdad
-al cambiar tramos/procesos. Referencias: PROJECT_STATEMENT §§2–3, 7 y 15;
-CU-01 a CU-05 y CU-21; AC-01 y AC-18.
+al cambiar tramos/procesos: la verificación por oráculo de
+`tests/test_workers.py`, descrita en EXPLICACION_CODIGO.md Parte 5.4. El
+recorrido ejecutable está en OPERACION.md §§7–8.

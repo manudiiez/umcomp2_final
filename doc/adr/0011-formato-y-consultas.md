@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -43,6 +43,7 @@ tráfico suma bytes, por lo que no se compara su suma con cantidad de líneas.
 
 ## Verificación y referencias
 
-CU-02 a CU-05 y CU-12; AC-01. Usar el ejemplo normativo de PROJECT_STATEMENT §7.3,
-datos con distintas zonas/días, escapes, bytes `-` e inválidas. Comprobar también
+Usar datos con distintas zonas/días, escapes, bytes `-` e inválidas, y comprobar
 rankings con empates y resultados que requieren sumar claves de muchos tramos.
+Las cuatro consultas, con ejemplos y salidas reales, están en OPERACION.md §5;
+los agregadores, en EXPLICACION_CODIGO.md, archivo 8 (`consultas.py`).

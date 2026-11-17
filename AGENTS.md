@@ -1,6 +1,6 @@
 # Instrucciones para agentes de LogHunter
 
-Leer `doc/PROJECT_STATEMENT.md`, `doc/USE_CASES.md` y `doc/adr/INDEX.md` para
+Leer `CLAUDE.md`, `doc/final/EXPLICACION_CODIGO.md` y `doc/adr/INDEX.md` para
 desarrollar el proyecto. Antes de gestionar cambios, commits o GitHub, leer y
 aplicar [.claude/skills/flujo-github/SKILL.md](.claude/skills/flujo-github/SKILL.md).
 

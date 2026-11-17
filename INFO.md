@@ -4,9 +4,10 @@ Resumen de las decisiones de arquitectura de LogHunter y por qué se tomaron,
 para quien evalúe o retome el proyecto sin leer los quince ADR completos.
 Cada sección enlaza el ADR que registra el contexto, las alternativas
 consideradas y las consecuencias aceptadas; este documento no reemplaza esos
-ADR, los resume. El contrato observable completo está en
-[PROJECT_STATEMENT.md](doc/PROJECT_STATEMENT.md); la evidencia real de cada
-decisión, en los `doc/VERIFICACION_*.md`.
+ADR, los resume. Cómo se implementa cada decisión está en
+[doc/final/EXPLICACION_CODIGO.md](doc/final/EXPLICACION_CODIGO.md); cómo
+ejecutarla y comprobarla, en
+[doc/final/OPERACION.md](doc/final/OPERACION.md).
 
 ## Por qué map-reduce y por qué ese alcance
 
@@ -49,7 +50,7 @@ coordinador lo intermedie. Esto es lo que permite, literalmente, que un
 worker viva en una máquina sin el archivo de log: verificado con un
 contenedor separado del log, real, no solo en teoría.
 → [ADR-0004](doc/adr/0004-lector-local-y-s3.md),
-[doc/VERIFICACION_DISTRIBUCION.md](doc/VERIFICACION_DISTRIBUCION.md).
+[OPERACION.md §4.4](doc/final/OPERACION.md).
 
 ## Por qué cada worker alinea su propio tramo
 
@@ -83,7 +84,7 @@ esperar el 100% de éxitos. Un `--job-timeout` revoca solo las tareas
 pendientes de ese job, sin afectar a otros clientes — verificado con
 infraestructura real, no solo con dobles, en el issue #23.
 → [ADR-0007](doc/adr/0007-jobs-admision-y-timeout.md),
-[doc/VERIFICACION_FALLOS.md](doc/VERIFICACION_FALLOS.md).
+[OPERACION.md §4.3](doc/final/OPERACION.md).
 
 ## Por qué un proceso indexador en vez de escribir SQLite desde el coordinador
 
@@ -152,7 +153,7 @@ evidencia de distribución real.
   → [ADR-0011](doc/adr/0011-formato-y-consultas.md).
 - **CLI con `argparse` y configuración por entorno**: flags explícitos
   priman sobre variables de entorno, que priman sobre los defaults del
-  código (documentado en `PROJECT_STATEMENT.md` §12.4); evita que un
+  código (ver `doc/final/OPERACION.md` §4); evita que un
   operador combine fuentes de configuración sin saber cuál ganó.
   → [ADR-0010](doc/adr/0010-cli-y-configuracion.md).
 
@@ -172,5 +173,4 @@ Las funcionalidades explícitamente excluidas del alcance (autenticación,
 UI web, `tail -f`, formatos distintos de combined, HA de la infraestructura,
 recuperación de jobs tras reiniciar el coordinador) no tienen ADR propio
 porque no se decidieron por descarte técnico sino por alcance acordado con
-la cátedra — están en [PROJECT_STATEMENT.md §3.2](doc/PROJECT_STATEMENT.md) y
-se retoman como mejoras futuras en [TODO.md](TODO.md).
+la cátedra, y se retoman como mejoras futuras en [TODO.md](TODO.md).

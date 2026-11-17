@@ -2,7 +2,7 @@
 
 - Fecha: 2026-11-02.
 - Estado: adoptado para implementación.
-- Referencia: [PROJECT_STATEMENT.md](../PROJECT_STATEMENT.md).
+- Referencia: [final/EXPLICACION_CODIGO.md](../final/EXPLICACION_CODIGO.md).
 
 ## Contexto
 
@@ -42,4 +42,5 @@ disjuntos ni que cada tarea lee exactamente `fin-inicio` bytes.
 
 CU-24; AC-03 y AC-04. Comparar contra referencia secuencial para cortes dentro,
 sobre y después de LF, entre CR/LF, UTF-8 multibyte, EOF sin salto, líneas largas
-y archivo vacío. El algoritmo normativo completo está en PROJECT_STATEMENT §8.
+y archivo vacío. El algoritmo completo y su demostración de corrección están
+en EXPLICACION_CODIGO.md Parte 3.
